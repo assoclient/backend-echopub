@@ -1,0 +1,120 @@
+{
+  "info": {
+    "_postman_id": "b1e1e1e1-0000-0000-0000-000000000001",
+    "name": "WhatsApp Ads Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"1234567890\",\n  \"password\": \"test1234\",\n  \"role\": \"ambassador\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/auth/register", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "register"] }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"test1234\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/auth/login", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "User - Get All",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "http://localhost:5000/api/users", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "users"] }
+      }
+    },
+    {
+      "name": "User - Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"User2\",\n  \"email\": \"user2@example.com\",\n  \"phone\": \"9876543210\",\n  \"password\": \"user2pass\",\n  \"role\": \"advertiser\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/users", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "users"] }
+      }
+    },
+    {
+      "name": "Campaign - Get All",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "http://localhost:5000/api/campaigns", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "campaigns"] }
+      }
+    },
+    {
+      "name": "Campaign - Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"advertiser\": \"{{advertiserId}}\",\n  \"title\": \"Campagne Test\",\n  \"description\": \"Description\",\n  \"media_url\": \"http://image.url\",\n  \"target_link\": \"http://site.com\",\n  \"target_location\": {\n    \"type\": \"city\",\n    \"value\": \"Douala\"\n  },\n  \"cpv\": 15,\n  \"budget\": 10000\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/campaigns", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "campaigns"] }
+      }
+    },
+    {
+      "name": "AmbassadorCampaign - Get All",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "http://localhost:5000/api/ambassador-campaigns", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "ambassador-campaigns"] }
+      }
+    },
+    {
+      "name": "AmbassadorCampaign - Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ambassador\": \"{{ambassadorId}}\",\n  \"campaign\": \"{{campaignId}}\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/ambassador-campaigns", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "ambassador-campaigns"] }
+      }
+    },
+    {
+      "name": "Transaction - Get All",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "http://localhost:5000/api/transactions", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "transactions"] }
+      }
+    },
+    {
+      "name": "Transaction - Create",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user\": \"{{userId}}\",\n  \"type\": \"deposit\",\n  \"amount\": 5000,\n  \"method\": \"mobile_money\"\n}"
+        },
+        "url": { "raw": "http://localhost:5000/api/transactions", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "transactions"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "token", "value": "" },
+    { "key": "advertiserId", "value": "" },
+    { "key": "ambassadorId", "value": "" },
+    { "key": "campaignId", "value": "" },
+    { "key": "userId", "value": "" }
+  ]
+}
