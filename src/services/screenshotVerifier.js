@@ -40,7 +40,7 @@ function getExif(imagePath) {
 
 // OCR et analyse contextuelle
 async function analyzeScreenshotText(imagePath) {
-  const { data: { text } } = await Tesseract.recognize(imagePath, 'fra');
+  const { data: { text } } = await Tesseract.recognize(imagePath, 'eng+fra');
   return text;
 }
 
@@ -55,8 +55,8 @@ async function verifyScreenshot({ screenshotPath }) {
   const ocrText = await analyzeScreenshotText(screenshotPath);
   // 4. Checklist contextuelle
   const checklist = {
-    top_bar_contains: /statut/i.test(ocrText),
-    bottom_has_eyes_icon: /œil|vues|vu par/i.test(ocrText),
+    top_bar_contains: /statut|status/i.test(ocrText),
+    bottom_has_eyes_icon: /œil|vues|views|vu par/i.test(ocrText),
     image_contains_published_time: /(il y a|min|heure)/i.test(ocrText),
     exif,
     hash

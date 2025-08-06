@@ -21,22 +21,29 @@ const { verifyScreenshot } = require('../services/screenshotVerifier');
 const imageHash = require('image-hash');
 
 // Première capture (statut semi-validé)
-router.post('/screenshot/:ambassadorCampaignId', auth, upload.single('file'), async (req, res, next) => {
+router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier envoyé' });
     }
-    const { ambassadorCampaignId } = req.params;
-    const ac = await AmbassadorCampaign.findById(ambassadorCampaignId).populate('campaign');
+    const { campaign } = req.params;
+    const { ambassadorId } = req.user;
+    const ac = await Campaign.findById(campaign).populate('campaign');
     if (!ac) return res.status(404).json({ message: 'Attribution non trouvée' });
     // Si une première capture existe déjà, refuser
     if (ac.screenshot_url) {
       return res.status(400).json({ message: 'Première capture déjà envoyée. Utilisez /screenshot2 pour la seconde.' });
     }
+   
     // Analyse automatique (sans similarité visuelle)
     const report = await verifyScreenshot({ screenshotPath: req.file.path });
     ac.screenshot_url = `/uploads/${req.file.filename}`;
-    ac.status = (report.top_bar_contains && report.bottom_has_eyes_icon && report.image_contains_published_time) ? 'semi-validated' : 'pending';
+    if(!(report.top_bar_contains && report.bottom_has_eyes_icon && report.image_contains_published_time)){
+       return res.status(400).json({
+        message: 'Capture non conforme : vérifiez le statut, l\'icône de vues et le temps de publication.',
+        report
+      });
+    }
     await ac.save();
     res.status(201).json({
       message: 'Première capture uploadée',
