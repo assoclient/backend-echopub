@@ -42,6 +42,8 @@ exports.getCampaignDetails = async (req, res, next) => {
     next(err);
   }
 };
+const { logCampaignActivity, ACTIVITY_TYPES } = require('../utils/activityLogger');
+
 // Changement de statut d'une campagne avec validation des transitions
 exports.changeCampaignStatus = async (req, res, next) => {
   try {
@@ -95,8 +97,32 @@ exports.changeCampaignStatus = async (req, res, next) => {
         return res.status(403).json({ message: 'Seul l\'annonceur peut terminer cette campagne.' });
       }
     }
+    
     campaign.status = status;
     await campaign.save();
+    
+    // Logger l'activité selon le nouveau statut
+    let activityType = null;
+    switch (status) {
+      case 'active':
+        activityType = ACTIVITY_TYPES.CAMPAIGN_APPROVED;
+        break;
+      case 'paused':
+        activityType = ACTIVITY_TYPES.CAMPAIGN_PAUSED;
+        break;
+      case 'completed':
+        activityType = ACTIVITY_TYPES.CAMPAIGN_COMPLETED;
+        break;
+    }
+    
+    if (activityType) {
+      await logCampaignActivity(activityType, campaign, user, {
+        previousStatus: current,
+        newStatus: status,
+        changedBy: user?.name || 'Système'
+      });
+    }
+    
     res.json({ message: `Statut changé en ${status}`, campaign });
   } catch (err) {
     next(err);

@@ -27,13 +27,16 @@ const ambassadorCampaignRoutes = require('./routes/ambassadorCampaignRoutes');
 const ambassadorCampaignsRoutes = require('./routes/ambassadorCampaignsRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 app.use('/api/users', userRoutes);
-//app.use('/api/campaigns', campaignRoutes);
-app.use('/api/campaigns', ambassadorCampaignsRoutes);
-app.use('/api/ambassador-campaigns', ambassadorCampaignRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/ambassador-campaigns', ambassadorCampaignsRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admins', adminRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running');

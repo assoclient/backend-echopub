@@ -62,7 +62,7 @@ exports.getAllAdmins = async (req, res, next) => {
 // Création d'un admin
 exports.createAdmin = async (req, res, next) => {
   try {
-    const { name, email, password, role, permissions } = req.body;
+    const { name, email, password, role, phone, permissions } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Champs obligatoires manquants' });
     }
@@ -77,6 +77,7 @@ exports.createAdmin = async (req, res, next) => {
       email,
       password: hash,
       role: role || 'manager',
+      phone,
       permissions
     });
     res.status(201).json({ message: 'Admin créé', admin: { ...admin.toObject(), password: undefined } });

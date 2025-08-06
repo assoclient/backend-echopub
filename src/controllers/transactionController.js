@@ -27,6 +27,7 @@ exports.deleteTransaction = async (req, res, next) => {
 // Liste paginée et recherche transactions (par type ou status)
 
 const Transaction = require('../models/Transaction');
+const { logPaymentActivity } = require('../utils/activityLogger');
 
 exports.getAllTransactions = async (req, res, next) => {
   try {
@@ -131,6 +132,12 @@ exports.createTransaction = async (req, res, next) => {
     if (transaction) {
         transaction.status = 'confirmed';
         await transaction.save();
+        
+        // Logger l'activité de paiement
+        await logPaymentActivity(transaction, {
+          campaignTitle: campaignExists.title,
+          campaignId: campaignExists._id
+        });
       }
     return res.status(200).json({message: 'Transaction créée', transaction: initPayment.transaction, paymentStatus });
    
