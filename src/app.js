@@ -33,6 +33,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 app.use('/api/users', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/ambassador-campaigns', ambassadorCampaignsRoutes);
+app.use('/api/publications', ambassadorCampaignRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);

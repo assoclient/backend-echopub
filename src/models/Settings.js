@@ -28,15 +28,21 @@ const settingsSchema = new mongoose.Schema({
 
   // Paramètres de paiement
   payment: {
-    platformCommission: {
+    cpv: {
       type: Number,
-      min: 0,
+      min: 10,
+      max: 100,
+      default: 14
+    },
+    cpv_ambassador: {
+      type: Number,
+      min: 5,
       max: 50,
-      default: 10.0
+      default: 10
     },
     minCampaignAmount: {
       type: Number,
-      min: 1000,
+      min: 5000,
       default: 10000
     },
     maxCampaignAmount: {
@@ -130,7 +136,8 @@ settingsSchema.statics.getDefaultSettings = function() {
       timezone: 'Africa/Douala'
     },
     payment: {
-      platformCommission: 10.0,
+      cpv: 14,
+      cpv_ambassador: 10,
       minCampaignAmount: 10000,
       maxCampaignAmount: 1000000,
       mtnMoneyEnabled: true,

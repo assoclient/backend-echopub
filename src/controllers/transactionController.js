@@ -31,19 +31,43 @@ const { logPaymentActivity } = require('../utils/activityLogger');
 
 exports.getAllTransactions = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 10, search = '' } = req.query;
-    const query = search
-      ? {
-          $or: [
-            { type: { $regex: search, $options: 'i' } },
-            { status: { $regex: search, $options: 'i' } }
-          ]
-        }
-      : {};
+    const { page = 1, pageSize = 10, search = '', type = '', status = '', user = '' } = req.query;
+    
+    // Construire la requête de base
+    let query = {};
+    
+    // Filtre par type
+    if (type) {
+      query.type = type;
+    }
+    
+    // Filtre par statut
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filtre par utilisateur
+    if (user) {
+      query.user = user;
+    }
+    
+    // Recherche textuelle
+    if (search) {
+      query.$or = [
+        { type: { $regex: search, $options: 'i' } },
+        { status: { $regex: search, $options: 'i' } },
+        { reference: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
     const count = await Transaction.countDocuments(query);
     const docs = await Transaction.find(query)
+      .populate('user', 'name email phone')
+      .populate('campaign', 'title')
+      .sort({ createdAt: -1 })
       .skip((page - 1) * pageSize)
       .limit(Number(pageSize));
+      
     res.json({
       totalCount: count,
       page: Number(page),
@@ -99,6 +123,7 @@ exports.createTransaction = async (req, res, next) => {
                   name: userExists.name
                 },
                 reference,
+                campaign,
                 type,
                 method,
                 description: `Payment for Transaction ${reference}`

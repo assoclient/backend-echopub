@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const role = require('../middleware/role');
 
 // Récupérer tous les paramètres
-router.get('/', auth, role('admin', 'superadmin'), settingsController.getSettings);
+router.get('/', auth, settingsController.getSettings);
 
 // Mettre à jour les paramètres généraux
 router.put('/general', auth, role('admin', 'superadmin'), settingsController.updateGeneralSettings);

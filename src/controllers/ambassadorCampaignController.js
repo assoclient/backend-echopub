@@ -25,27 +25,47 @@ exports.deleteAmbassadorCampaign = async (req, res, next) => {
 // Contrôleur AmbassadorCampaign
 
 // Liste paginée et recherche campagnes ambassadeur (par titre campagne)
-
 const AmbassadorCampaign = require('../models/AmbassadorCampaign');
 
 exports.getAllAmbassadorCampaigns = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 10, search = '' } = req.query;
+    const { page = 1, pageSize = 10, search = '', status = '' } = req.query;
     const Campaign = require('../models/Campaign');
-    // On recherche sur le titre de la campagne liée
-    let campaignIds = [];
+    const User = require('../models/User');
+    
+    // Construire la requête de base
+    let query = {};
+    
+    // Recherche par titre de campagne
     if (search) {
       const campaigns = await Campaign.find({ title: { $regex: search, $options: 'i' } }, '_id');
-      campaignIds = campaigns.map(c => c._id);
+      const campaignIds = campaigns.map(c => c._id);
+      if (campaignIds.length > 0) {
+        query.campaign = { $in: campaignIds };
+      } else {
+        // Si aucune campagne trouvée, retourner un résultat vide
+        return res.json({
+          totalCount: 0,
+          page: Number(page),
+          pageSize: 0,
+          data: []
+        });
+      }
     }
-    const query = search && campaignIds.length > 0
-      ? { campaign: { $in: campaignIds } }
-      : {};
+    
+    // Filtrage par statut
+    if (status) {
+      query.status = status;
+    }
+    
     const count = await AmbassadorCampaign.countDocuments(query);
     const docs = await AmbassadorCampaign.find(query)
-      .populate('campaign')
+      .populate('campaign', 'title budget status')
+      .populate('ambassador', 'name email')
+      .sort({ createdAt: -1 }) // Les plus récentes en premier
       .skip((page - 1) * pageSize)
       .limit(Number(pageSize));
+      
     res.json({
       totalCount: count,
       page: Number(page),

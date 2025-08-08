@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
 const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
+const { verifyScreenshot } = require('../services/screenshotVerifier');
+const Campaign = require('../models/Campaign');
+const AmbassadorCampaign = require('../models/AmbassadorCampaign');
 
 // Upload image ou vidéo (authentifié)
 router.post('/', auth, upload.single('file'), (req, res) => {
@@ -15,9 +18,7 @@ router.post('/', auth, upload.single('file'), (req, res) => {
 });
 
 // Upload d'une capture d'écran pour prouver la publication (ambassadeur)
-const AmbassadorCampaign = require('../models/AmbassadorCampaign');
-const Campaign = require('../models/Campaign');
-const { verifyScreenshot } = require('../services/screenshotVerifier');
+const { analyzeScreenshotText } = require('../services/screenshotVerifier');
 const imageHash = require('image-hash');
 
 // Première capture (statut semi-validé)
@@ -27,30 +28,55 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
       return res.status(400).json({ message: 'Aucun fichier envoyé' });
     }
     const { campaign } = req.params;
-    const { ambassadorId } = req.user;
-    const ac = await Campaign.findById(campaign).populate('campaign');
-    if (!ac) return res.status(404).json({ message: 'Attribution non trouvée' });
+    const ambassadorId = req.user.id; // Utiliser req.user.id au lieu de req.user.ambassadorId
+    
+    // Vérifier si la campagne existe
+    const campaignDoc = await Campaign.findById(campaign);
+    if (!campaignDoc) {
+      return res.status(404).json({ message: 'Campagne non trouvée' });
+    }
+    
+    // Vérifier si une publication existe déjà pour cet ambassadeur et cette campagne
+    let ambassadorCampaign = await AmbassadorCampaign.findOne({
+      ambassador: ambassadorId,
+      campaign: campaign
+    });
+    
+    // Si aucune publication n'existe, en créer une nouvelle
+    if (!ambassadorCampaign) {
+      ambassadorCampaign = new AmbassadorCampaign({
+        ambassador: ambassadorId,
+        campaign: campaign,
+        status: 'published'
+      });
+    }
+    if(ambassadorCampaign.status !== 'published'){
+      return res.status(400).json({ message: 'Vous avez déjà publié cette campagne' });
+    }
     // Si une première capture existe déjà, refuser
-    if (ac.screenshot_url) {
+    if (ambassadorCampaign.screenshot_url) {
       return res.status(400).json({ message: 'Première capture déjà envoyée. Utilisez /screenshot2 pour la seconde.' });
     }
    
     // Analyse automatique (sans similarité visuelle)
     const report = await verifyScreenshot({ screenshotPath: req.file.path });
-    ac.screenshot_url = `/uploads/${req.file.filename}`;
+    ambassadorCampaign.screenshot_url = `/uploads/${req.file.filename}`;
+    
     if(!(report.top_bar_contains && report.bottom_has_eyes_icon && report.image_contains_published_time)){
        return res.status(400).json({
         message: 'Capture non conforme : vérifiez le statut, l\'icône de vues et le temps de publication.',
         report
       });
     }
-    await ac.save();
+    
+    await ambassadorCampaign.save();
+    
     res.status(201).json({
-      message: 'Première capture uploadée',
-      fileUrl: ac.screenshot_url,
+      message: 'Première capture uploadée et publication enregistrée',
+      fileUrl: ambassadorCampaign.screenshot_url,
       report,
-      status: ac.status,
-      ambassadorCampaign: ac
+      status: ambassadorCampaign.status,
+      ambassadorCampaign: ambassadorCampaign
     });
   } catch (err) {
     next(err);
@@ -58,7 +84,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
 });
 
 // Deuxième capture (18h après) et comparaison
-const { analyzeScreenshotText } = require('../services/screenshotVerifier');
+//const { analyzeScreenshotText } = require('../services/screenshotVerifier');
 router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {

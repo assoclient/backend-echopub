@@ -1,6 +1,6 @@
 exports.initializePayment = async (body,userData) => {
   try {
-    const { user, type, amount, reference,description,method } = body;
+    const { campaign, type, amount, reference,description,method } = body;
     const Transaction = require('../models/Transaction');
 
     const response = await fetch('https://api.notchpay.co/payments/initialize', {
@@ -37,6 +37,7 @@ exports.initializePayment = async (body,userData) => {
       method,
       status: 'pending',
       reference,
+      campaign,
       transactionId: data.transaction.reference
     });
 

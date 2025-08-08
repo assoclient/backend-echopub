@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, required: false, unique: true },
-  phone: { type: String, required: false, unique: true },
+  email: { type: String, required: false},
+  phone: { type: String, required: false},
   password: { type: String, required: true },
   role: { type: String, enum: ['ambassador', 'advertiser', 'admin'], required: true },
   whatsapp_number: { type: String },
@@ -21,13 +21,13 @@ const userSchema = new mongoose.Schema({
   contacts_count: Number, // pour les ambassadeurs
   balance: { type: Number, default: 0 }, // Solde actuel de l'utilisateur
   isValid:{type:Boolean,default:true},
-  audience:[
+  audience:
     {
       city:[{pourcentage:Number,value:String}],
       age:[{pourcentage:Number,value:{min:Number,max:Number}}],
       genre:[{pourcentage:Number,value:String,enum:['M','F']}],
       }
-  ]
+  
 
 }, { timestamps: true });
 

@@ -42,6 +42,69 @@ exports.getCampaignDetails = async (req, res, next) => {
     next(err);
   }
 };
+
+// Détails d'une campagne pour l'annonceur connecté avec ses publications
+exports.getMyCampaignDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const advertiserId = req.user.id;
+    
+    const Campaign = require('../models/Campaign');
+    const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+    
+    // Vérifier que la campagne appartient à l'annonceur connecté
+    const campaign = await Campaign.findOne({ _id: id, advertiser: advertiserId }).lean();
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campagne non trouvée ou accès non autorisé' });
+    }
+
+    // Récupérer toutes les publications liées à cette campagne
+    const publications = await AmbassadorCampaign.find({ campaign: id })
+      .populate('ambassador', 'name phone email')
+      .sort({ createdAt: -1 });
+
+    // Calculer les stats globales
+    let totalViews = 0;
+    let totalClicks = 0;
+    let totalPublications = 0;
+    
+    publications.forEach(pub => {
+      totalViews += pub.views_count || 0;
+      totalClicks += pub.clicks_count || 0;
+      if (pub.status === 'approved' || pub.status === 'pending') {
+        totalPublications++;
+      }
+    });
+
+    // Formatage des publications avec les preuves
+    const formattedPublications = publications.map(pub => ({
+      _id: pub._id,
+      ambassador_name: pub.ambassador?.name || 'Ambassadeur inconnu',
+      ambassador_phone: pub.ambassador?.phone || '',
+      ambassador_email: pub.ambassador?.email || '',
+      views: pub.views_count || 0,
+      clicks: pub.clicks_count || 0,
+      proof1: pub.screenshot_url,
+      proof2: pub.screenshot_url2,
+      createdAt: pub.createdAt,
+      status: pub.status,
+      publication_url: pub.publication_url || ''
+    }));
+
+    res.json({
+      campaign: {
+        ...campaign,
+        total_views: totalViews,
+        total_clicks: totalClicks,
+        total_publications: totalPublications
+      },
+      publications: formattedPublications
+    });
+  } catch (err) {
+    console.error('Erreur lors de la récupération des détails de la campagne:', err);
+    next(err);
+  }
+};
 const { logCampaignActivity, ACTIVITY_TYPES } = require('../utils/activityLogger');
 
 // Changement de statut d'une campagne avec validation des transitions
@@ -183,6 +246,109 @@ exports.getAdvertiserCampaigns = async (req, res, next) => {
     next(err);
   }
 };
+
+// Récupérer les campagnes de l'annonceur connecté avec stats et pagination
+exports.getMyCampaigns = async (req, res, next) => {
+  try {
+    const advertiserId = req.user.id; // ID de l'annonceur connecté
+    if (!advertiserId) return res.status(401).json({ message: "Utilisateur non authentifié" });
+
+    let { page = 1, pageSize = 10, search = '', status = '', sortBy = 'createdAt' } = req.query;
+    page = Number(page);
+    pageSize = Number(pageSize);
+
+    // Construire la requête de base
+    let query = { advertiser: advertiserId };
+    
+    // Ajouter le filtre de recherche
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Ajouter le filtre de statut
+    if (status) {
+      query.status = status;
+    }
+
+    // Compter le total
+    const totalCount = await Campaign.countDocuments(query);
+    
+    // Construire la requête de tri
+    let sortQuery = {};
+    switch (sortBy) {
+      case 'budget':
+        sortQuery.budget = -1;
+        break;
+      case 'views':
+        sortQuery.expected_views = -1;
+        break;
+      case 'clicks':
+        sortQuery.expected_views = -1; // Fallback, sera remplacé par les stats
+        break;
+      default:
+        sortQuery.createdAt = -1;
+    }
+
+    // Paginer les campagnes
+    const campaigns = await Campaign.find(query)
+      .sort(sortQuery)
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .lean();
+
+    const campaignIds = campaigns.map(c => c._id);
+    const Publication = require('../models/AmbassadorCampaign');
+    const stats = await Publication.aggregate([
+      { $match: { campaign: { $in: campaignIds }, status: 'validated' } },
+      { $group: {
+          _id: "$campaign",
+          totalViews: { $sum: "$views_count" },
+          totalClick: { $sum: "$clicks_count" },
+          totalPublications: { $sum: 1 },
+          totalSpent: { $sum: "$amount_earned" }
+        }
+      }
+    ]);
+    
+    const statsMap = {};
+    stats.forEach(s => {
+      statsMap[s._id.toString()] = s;
+    });
+    
+    const result = campaigns.map(c => {
+      const s = statsMap[c._id.toString()] || {};
+      return {
+        ...c,
+        views: s.totalViews || 0,
+        clicks: s.totalClick || 0,
+        publications: s.totalPublications || 0,
+        spent: s.totalSpent || 0,
+        progress: c.expected_views > 0 ? Math.min(100, Math.round((s.totalViews || 0) / c.expected_views * 100)) : 0
+      };
+    });
+
+    // Tri côté serveur si nécessaire
+    if (sortBy === 'views' || sortBy === 'clicks') {
+      result.sort((a, b) => {
+        if (sortBy === 'views') return b.views - a.views;
+        if (sortBy === 'clicks') return b.clicks - a.clicks;
+        return 0;
+      });
+    }
+
+    res.json({
+      totalCount,
+      page,
+      pageSize: result.length,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 // Mise à jour d'une campagne (supporte upload de média)
 exports.updateCampaign = async (req, res, next) => {
   try {
@@ -288,34 +454,34 @@ exports.createCampaign = async (req, res, next) => {
       media_url = `${baseUrl}${relPath}`;
      
     }
-
+     // Récupérer les paramètres de la plateforme pour les CPV
+     const Settings = require('../models/Settings');
+     const settings = await Settings.findOne() || await Settings.create({}); 
+    data.expected_views = Math.floor(data.budget / settings.payment.cpv);
     const {
-      advertiser,
       title,
       description,
       target_link,
       target_location,
-      cpv,
-      cpc,
       start_date,
       end_date,
       budget,
-      location_type
+      location_type,
+      expected_views
     } = data;
+    
+    // Récupérer l'ID de l'annonceur depuis l'utilisateur connecté
+    const advertiser = req.user.id;
+    
+   
+    const cpv = settings.payment.cpv;
+    const cpv_ambassador = settings.payment.cpv_ambassador;
         
     // Validation simple
-    if (!advertiser || !title || !target_link || !target_location || (!cpv && !cpc) || !budget) {
+    if (!title || !target_link || !target_location || !budget) {
       return res.status(400).json({ message: 'Champs obligatoires manquants' });
     }
-    if (cpv && cpv < 10) {
-      return res.status(400).json({ message: 'CPV minimum 10 FCFA' });
-    }
-    if (cpc && cpc < 20) {
-      return res.status(400).json({ message: 'CPC minimum 20 FCFA' });
-    }
-  /*   if (!['city', 'region', 'radius'].includes(target_location.type)) {
-      return res.status(400).json({ message: 'Type de ciblage invalide' });
-    } */
+    
     const campaign = await Campaign.create({
       advertiser,
       title,
@@ -325,10 +491,11 @@ exports.createCampaign = async (req, res, next) => {
       location_type,
       target_location,
       cpv,
-      cpc,
+      cpv_ambassador,
       start_date,
       end_date,
       budget,
+      expected_views,
       status: 'draft'
     });
     res.status(201).json({ message: 'Campagne créée', campaign });

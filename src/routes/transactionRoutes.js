@@ -10,11 +10,39 @@ const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 
 // Seuls les admins peuvent voir toutes les transactions
-router.get('/', auth, role('admin'), transactionController.getAllTransactions);
+router.get('/', auth, role('admin','superadmin'), transactionController.getAllTransactions);
+
+// Récupérer les transactions de l'utilisateur connecté
+router.get('/my-transactions', auth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, pageSize = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    
+    const total = await Transaction.countDocuments({ user: userId });
+    const transactions = await Transaction.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(pageSize))
+      .populate('campaign', 'title');
+
+    res.json({
+      totalCount: total,
+      page: Number(page),
+      pageSize: transactions.length,
+      data: transactions
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Création d'une transaction (paiement, retrait, etc.)
 router.post('/', auth, role('admin', 'advertiser', 'ambassador'), transactionController.createTransaction);
+
 // Mise à jour d'une transaction (admin uniquement)
 router.put('/:id', auth, role('admin'), transactionController.updateTransaction);
+
 // Suppression d'une transaction (admin uniquement)
 router.delete('/:id', auth, role('admin'), transactionController.deleteTransaction);
 
