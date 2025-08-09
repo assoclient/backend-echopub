@@ -5,7 +5,7 @@ const { logUserActivity, ACTIVITY_TYPES } = require('../utils/activityLogger');
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role, whatsapp_number, location, contacts_count } = req.body;
+    const { name, email, phone, password, role, whatsapp_number, location, contacts_count, audience } = req.body;
     if(email){
       const existing = await User.findOne({ email });
       if (existing) return res.status(400).json({ message: 'Email déjà utilisé' });
@@ -16,7 +16,7 @@ exports.register = async (req, res, next) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const user = await User.create({
-      name, email, phone, password: hash, role, whatsapp_number, location, contacts_count
+      name, email, phone, password: hash, role, whatsapp_number, location, contacts_count, audience
     });
     
     // Logger l'activité selon le rôle
@@ -28,7 +28,7 @@ exports.register = async (req, res, next) => {
     await logUserActivity(activityType, user, {
       registrationMethod: 'email',
       location: location || 'Non spécifié'
-    }, req);
+    });
     
     // Générer un token JWT comme pour le login
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -55,13 +55,6 @@ exports.login = async (req, res, next) => {
     if (!user) return res.status(400).json({ message: 'Utilisateur introuvable' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: 'Mot de passe incorrect' });
-    
-    // Logger l'activité de connexion
-    await logUserActivity(ACTIVITY_TYPES.USER_LOGIN, user, {
-      loginMethod: 'email',
-      success: true
-    }, req);
-    
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { ...user.toObject(), password: undefined } });
   } catch (err) {

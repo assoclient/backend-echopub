@@ -1,168 +1,139 @@
-const mongoose = require('mongoose');
 const Activity = require('../models/Activity');
 
-// Définir les types d'activités (en accord avec le modèle existant)
+// Types d'activités supportés
 const ACTIVITY_TYPES = {
-  USER_REGISTERED: 'user_registered',
-  AMBASSADOR_JOINED: 'ambassador_joined',
-  USER_LOGIN: 'user_login',
   CAMPAIGN_CREATED: 'campaign_created',
-  CAMPAIGN_UPDATED: 'campaign_updated',
-  CAMPAIGN_DELETED: 'campaign_deleted',
-  PUBLICATION_CREATED: 'publication_created',
-  PUBLICATION_VALIDATED: 'publication_validated',
-  TRANSACTION_CREATED: 'transaction_created',
-  PAYMENT_PROCESSED: 'payment_processed',
-  ADMIN_ACTION: 'admin_action',
-  SETTINGS_UPDATED: 'settings_updated'
+  CAMPAIGN_APPROVED: 'campaign_approved',
+  CAMPAIGN_REJECTED: 'campaign_rejected',
+  CAMPAIGN_COMPLETED: 'campaign_completed',
+  CAMPAIGN_PAUSED: 'campaign_paused',
+  PAYMENT_RECEIVED: 'payment_received',
+  USER_REGISTERED: 'user_registered',
+  AMBASSADOR_JOINED: 'ambassador_joined'
+};
+
+// Titres par défaut pour chaque type d'activité
+const DEFAULT_TITLES = {
+  [ACTIVITY_TYPES.CAMPAIGN_CREATED]: 'Nouvelle campagne créée',
+  [ACTIVITY_TYPES.CAMPAIGN_APPROVED]: 'Campagne approuvée',
+  [ACTIVITY_TYPES.CAMPAIGN_REJECTED]: 'Campagne rejetée',
+  [ACTIVITY_TYPES.CAMPAIGN_COMPLETED]: 'Campagne terminée',
+  [ACTIVITY_TYPES.CAMPAIGN_PAUSED]: 'Campagne mise en pause',
+  [ACTIVITY_TYPES.PAYMENT_RECEIVED]: 'Paiement reçu',
+  [ACTIVITY_TYPES.USER_REGISTERED]: 'Nouvel utilisateur inscrit',
+  [ACTIVITY_TYPES.AMBASSADOR_JOINED]: 'Nouvel ambassadeur rejoint'
+};
+
+// Descriptions par défaut pour chaque type d'activité
+const DEFAULT_DESCRIPTIONS = {
+  [ACTIVITY_TYPES.CAMPAIGN_CREATED]: 'Une nouvelle campagne publicitaire a été créée',
+  [ACTIVITY_TYPES.CAMPAIGN_APPROVED]: 'Une campagne a été approuvée par l\'administrateur',
+  [ACTIVITY_TYPES.CAMPAIGN_REJECTED]: 'Une campagne a été rejetée par l\'administrateur',
+  [ACTIVITY_TYPES.CAMPAIGN_COMPLETED]: 'Une campagne a été marquée comme terminée',
+  [ACTIVITY_TYPES.CAMPAIGN_PAUSED]: 'Une campagne a été mise en pause temporairement',
+  [ACTIVITY_TYPES.PAYMENT_RECEIVED]: 'Un nouveau paiement a été reçu',
+  [ACTIVITY_TYPES.USER_REGISTERED]: 'Un nouvel utilisateur s\'est inscrit sur la plateforme',
+  [ACTIVITY_TYPES.AMBASSADOR_JOINED]: 'Un nouvel ambassadeur a rejoint la plateforme'
 };
 
 /**
- * Enregistre une activité utilisateur
- * @param {string} type - Type d'activité (ACTIVITY_TYPES)
- * @param {Object} user - Objet utilisateur
+ * Créer une nouvelle activité
+ * @param {string} type - Type d'activité
+ * @param {string} title - Titre de l'activité (optionnel)
+ * @param {string} description - Description de l'activité (optionnel)
  * @param {Object} metadata - Métadonnées supplémentaires
- * @param {Object} req - Objet request (optionnel, pour IP et User-Agent)
+ * @param {Object} references - Références aux modèles (userId, adminId, campaignId, etc.)
  */
-const logUserActivity = async (type, user, metadata = {}, req = null) => {
+const createActivity = async (type, title = null, description = null, metadata = {}, references = {}) => {
   try {
-    const descriptions = {
-      [ACTIVITY_TYPES.USER_REGISTERED]: 'Nouvel utilisateur inscrit',
-      [ACTIVITY_TYPES.AMBASSADOR_JOINED]: 'Nouvel ambassadeur rejoint la plateforme',
-      [ACTIVITY_TYPES.USER_LOGIN]: 'Connexion utilisateur',
-      [ACTIVITY_TYPES.CAMPAIGN_CREATED]: 'Nouvelle campagne créée',
-      [ACTIVITY_TYPES.CAMPAIGN_UPDATED]: 'Campagne mise à jour',
-      [ACTIVITY_TYPES.CAMPAIGN_DELETED]: 'Campagne supprimée',
-      [ACTIVITY_TYPES.PUBLICATION_CREATED]: 'Nouvelle publication créée',
-      [ACTIVITY_TYPES.PUBLICATION_VALIDATED]: 'Publication validée',
-      [ACTIVITY_TYPES.TRANSACTION_CREATED]: 'Nouvelle transaction créée',
-      [ACTIVITY_TYPES.PAYMENT_PROCESSED]: 'Paiement traité',
-      [ACTIVITY_TYPES.ADMIN_ACTION]: 'Action administrative effectuée',
-      [ACTIVITY_TYPES.SETTINGS_UPDATED]: 'Paramètres mis à jour'
-    };
+    // Vérifier que le type est valide
+    if (!Object.values(ACTIVITY_TYPES).includes(type)) {
+      console.error(`Type d'activité invalide: ${type}`);
+      return null;
+    }
 
-    const activity = new Activity({
+    // Utiliser les titres et descriptions par défaut si non fournis
+    const activityTitle = title || DEFAULT_TITLES[type];
+    const activityDescription = description || DEFAULT_DESCRIPTIONS[type];
+
+    const activityData = {
       type,
-      title: descriptions[type] || 'Activité enregistrée',
-      description: `${user.name} (${user.role}) - ${descriptions[type] || 'Activité enregistrée'}`,
-      userId: user._id || user.id,
-      metadata: {
-        ...metadata,
-        userId: user._id || user.id,
-        userRole: user.role,
-        userName: user.name,
-        ipAddress: req?.ip || req?.connection?.remoteAddress,
-        userAgent: req?.headers?.['user-agent']
-      }
-    });
-
-    await activity.save();
-    
-    // Log en console pour le développement
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[ACTIVITY] ${type}: ${user.name} (${user.role})`);
-    }
-  } catch (error) {
-    // Ne pas faire échouer l'application si le logging échoue
-    console.error('Erreur lors de l\'enregistrement de l\'activité:', error);
-  }
-};
-
-/**
- * Récupère les activités d'un utilisateur
- * @param {string} userId - ID de l'utilisateur
- * @param {number} limit - Nombre d'activités à récupérer
- * @param {number} skip - Nombre d'activités à ignorer
- */
-const getUserActivities = async (userId, limit = 50, skip = 0) => {
-  try {
-    return await Activity.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip)
-      .populate('userId', 'name email role');
-  } catch (error) {
-    console.error('Erreur lors de la récupération des activités:', error);
-    return [];
-  }
-};
-
-/**
- * Récupère toutes les activités (pour les admins)
- * @param {Object} filters - Filtres optionnels
- * @param {number} limit - Nombre d'activités à récupérer
- * @param {number} skip - Nombre d'activités à ignorer
- */
-const getAllActivities = async (filters = {}, limit = 100, skip = 0) => {
-  try {
-    const query = {};
-    
-    if (filters.type) {
-      query.type = filters.type;
-    }
-    
-    if (filters.userId) {
-      query.userId = filters.userId;
-    }
-    
-    if (filters.startDate && filters.endDate) {
-      query.createdAt = {
-        $gte: new Date(filters.startDate),
-        $lte: new Date(filters.endDate)
-      };
-    }
-
-    return await Activity.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip)
-      .populate('userId', 'name email role');
-  } catch (error) {
-    console.error('Erreur lors de la récupération des activités:', error);
-    return [];
-  }
-};
-
-/**
- * Récupère les statistiques d'activité
- */
-const getActivityStats = async () => {
-  try {
-    const stats = await Activity.aggregate([
-      {
-        $group: {
-          _id: '$type',
-          count: { $sum: 1 },
-          lastActivity: { $max: '$createdAt' }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ]);
-
-    const totalActivities = await Activity.countDocuments();
-    const todayActivities = await Activity.countDocuments({
-      createdAt: {
-        $gte: new Date(new Date().setHours(0, 0, 0, 0))
-      }
-    });
-
-    return {
-      byType: stats,
-      total: totalActivities,
-      today: todayActivities
+      title: activityTitle,
+      description: activityDescription,
+      metadata,
+      ...references
     };
+
+    const activity = new Activity(activityData);
+    await activity.save();
+
+    console.log(`✅ Activité créée: ${activityTitle} (${type})`);
+    return activity;
+
   } catch (error) {
-    console.error('Erreur lors de la récupération des statistiques:', error);
-    return { byType: [], total: 0, today: 0 };
+    console.error('❌ Erreur lors de la création de l\'activité:', error);
+    return null;
   }
+};
+
+/**
+ * Créer une activité pour une campagne
+ */
+const logCampaignActivity = async (type, campaign, user = null, additionalMetadata = {}) => {
+  const metadata = {
+    campaignTitle: campaign.title,
+    campaignId: campaign._id,
+    ...additionalMetadata
+  };
+
+  const references = {
+    campaignId: campaign._id,
+    userId: user?._id || campaign.advertiser
+  };
+
+  return await createActivity(type, null, null, metadata, references);
+};
+
+/**
+ * Créer une activité pour un utilisateur
+ */
+const logUserActivity = async (type, user, additionalMetadata = {}) => {
+  const metadata = {
+    userName: user.name,
+    userEmail: user.email,
+    userRole: user.role,
+    ...additionalMetadata
+  };
+
+  const references = {
+    userId: user._id
+  };
+
+  return await createActivity(type, null, null, metadata, references);
+};
+
+/**
+ * Créer une activité pour un paiement
+ */
+const logPaymentActivity = async (transaction, additionalMetadata = {}) => {
+  const metadata = {
+    amount: transaction.amount,
+    paymentMethod: transaction.paymentMethod,
+    ...additionalMetadata
+  };
+
+  const references = {
+    transactionId: transaction._id,
+    userId: transaction.user
+  };
+
+  return await createActivity(ACTIVITY_TYPES.PAYMENT_RECEIVED, null, null, metadata, references);
 };
 
 module.exports = {
+  ACTIVITY_TYPES,
+  createActivity,
+  logCampaignActivity,
   logUserActivity,
-  getUserActivities,
-  getAllActivities,
-  getActivityStats,
-  ACTIVITY_TYPES
+  logPaymentActivity
 }; 

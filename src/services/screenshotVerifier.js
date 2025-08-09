@@ -48,7 +48,7 @@ async function analyzeScreenshotText(imagePath) {
 // Vérification complète (sans comparaison visuelle pour supporter les vidéos)
 async function verifyScreenshot({ screenshotPath }) {
   // 1. Hash
-  const hash = await getImageHash(screenshotPath);
+  //const hash = await getImageHash(screenshotPath);
   // 2. EXIF
   const exif = getExif(screenshotPath);
   // 3. OCR
@@ -59,7 +59,7 @@ async function verifyScreenshot({ screenshotPath }) {
     bottom_has_eyes_icon: /œil|vues|views|vu par/i.test(ocrText),
     image_contains_published_time: /(il y a|min|heure)/i.test(ocrText),
     exif,
-    hash
+    //hash
   };
   return checklist;
 }

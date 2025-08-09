@@ -32,8 +32,8 @@ const settingsRoutes = require('./routes/settingsRoutes');
 
 app.use('/api/users', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
-app.use('/api/ambassador-campaigns', ambassadorCampaignsRoutes);
-app.use('/api/publications', ambassadorCampaignRoutes);
+app.use('/api/publications', ambassadorCampaignRoutes); // Pour la gestion des publications
+app.use('/api/ambassador-campaigns', ambassadorCampaignsRoutes); // Pour les campagnes actives des ambassadeurs
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);

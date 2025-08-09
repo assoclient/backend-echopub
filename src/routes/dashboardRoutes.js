@@ -20,6 +20,3 @@ router.put('/activities/:activityId/read', auth, role('admin', 'superadmin'), da
 router.put('/activities/read-all', auth, role('admin', 'superadmin'), dashboardController.markAllActivitiesAsRead);
 
 module.exports = router; 
-router.put('/activities/read-all', auth, role('admin', 'superadmin'), dashboardController.markAllActivitiesAsRead);
-
-module.exports = router; 

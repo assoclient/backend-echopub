@@ -1,21 +1,22 @@
 const express = require('express');
 const router = express.Router();
-
+const ambassadorCampaignController = require('../controllers/ambassadorCampaignController');
 const auth = require('../middleware/auth');
 const role = require('../middleware/role');
 
-const ambassadorCampaignController = require('../controllers/ambassadorCampaignController');
+// Récupérer toutes les publications des ambassadeurs (admin seulement)
+router.get('/', auth, role('admin', 'superadmin'), ambassadorCampaignController.getAllAmbassadorCampaigns);
 
-// Seuls les ambassadeurs peuvent accéder à leurs campagnes
-router.get('/', auth, role('superadmin','admin'), ambassadorCampaignController.getAllAmbassadorCampaigns);
-// Attribution d'une campagne à un ambassadeur
-router.post('/', auth, role('ambassador'), ambassadorCampaignController.createAmbassadorCampaign);
-// Mise à jour d'une attribution (ambassadeur ou admin)
-router.put('/:id', auth, (req, res, next) => {
-  if (req.user.role === 'admin' || req.user.role === 'ambassador') return next();
-  return res.status(403).json({ message: 'Accès refusé' });
-}, ambassadorCampaignController.updateAmbassadorCampaign);
-// Suppression d'une attribution (admin uniquement)
-router.delete('/:id', auth, role('admin'), ambassadorCampaignController.deleteAmbassadorCampaign);
+// Créer une attribution ambassadeur-campagne
+router.post('/', auth, role('admin', 'superadmin'), ambassadorCampaignController.createAmbassadorCampaign);
+
+// Mettre à jour une attribution ambassadeur-campagne
+router.put('/:id', auth, role('admin', 'superadmin'), ambassadorCampaignController.updateAmbassadorCampaign);
+
+// Supprimer une attribution ambassadeur-campagne
+router.delete('/:id', auth, role('admin', 'superadmin'), ambassadorCampaignController.deleteAmbassadorCampaign);
+
+// Valider une publication d'ambassadeur (admin seulement)
+router.put('/:id/validate', auth, role('admin', 'superadmin'), ambassadorCampaignController.validatePublication);
 
 module.exports = router;

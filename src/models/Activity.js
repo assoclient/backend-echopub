@@ -4,13 +4,7 @@ const activitySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: [
-      'campaign_created', 'campaign_approved', 'campaign_rejected', 'payment_received', 
-      'user_registered', 'ambassador_joined', 'campaign_completed', 'campaign_paused',
-      'user_login', 'campaign_updated', 'campaign_deleted', 'publication_created', 
-      'publication_validated', 'transaction_created', 'payment_processed', 'admin_action', 
-      'settings_updated'
-    ]
+    enum: ['campaign_created', 'campaign_approved', 'campaign_rejected', 'payment_received', 'user_registered', 'ambassador_joined', 'campaign_completed', 'campaign_paused']
   },
   title: {
     type: String,

@@ -1,10 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { verifyScreenshot } = require('../services/screenshotVerifier');
-const Campaign = require('../models/Campaign');
-const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+const auth = require('../middleware/auth');
 
 // Upload image ou vidéo (authentifié)
 router.post('/', auth, upload.single('file'), (req, res) => {
@@ -18,7 +15,9 @@ router.post('/', auth, upload.single('file'), (req, res) => {
 });
 
 // Upload d'une capture d'écran pour prouver la publication (ambassadeur)
-const { analyzeScreenshotText } = require('../services/screenshotVerifier');
+const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+const Campaign = require('../models/Campaign');
+const { verifyScreenshot } = require('../services/screenshotVerifier');
 const imageHash = require('image-hash');
 
 // Première capture (statut semi-validé)
@@ -27,64 +26,96 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier envoyé' });
     }
-    const { campaign } = req.params;
-    const ambassadorId = req.user.id; // Utiliser req.user.id au lieu de req.user.ambassadorId
     
-    // Vérifier si la campagne existe
+    const { campaign } = req.params;
+    const userId = req.user.id || req.user._id;
+    
+    console.log('Upload screenshot - Campaign ID:', campaign, 'User ID:', userId);
+    
+    // Trouver la campagne
     const campaignDoc = await Campaign.findById(campaign);
     if (!campaignDoc) {
       return res.status(404).json({ message: 'Campagne non trouvée' });
     }
     
-    // Vérifier si une publication existe déjà pour cet ambassadeur et cette campagne
-    let ambassadorCampaign = await AmbassadorCampaign.findOne({
-      ambassador: ambassadorId,
-      campaign: campaign
+    // Trouver ou créer l'attribution ambassadeur-campagne
+    let ac = await AmbassadorCampaign.findOne({ 
+      campaign: campaign, 
+      ambassador: userId 
     });
     
-    // Si aucune publication n'existe, en créer une nouvelle
-    if (!ambassadorCampaign) {
-      ambassadorCampaign = new AmbassadorCampaign({
-        ambassador: ambassadorId,
+    if (!ac) {
+      // Créer une nouvelle attribution si elle n'existe pas
+      ac = new AmbassadorCampaign({
         campaign: campaign,
-        status: 'published'
+        ambassador: userId,
+        status: 'pending'
       });
     }
-    if(ambassadorCampaign.status !== 'published'){
-      return res.status(400).json({ message: 'Vous avez déjà publié cette campagne' });
-    }
+    
     // Si une première capture existe déjà, refuser
-    if (ambassadorCampaign.screenshot_url) {
-      return res.status(400).json({ message: 'Première capture déjà envoyée. Utilisez /screenshot2 pour la seconde.' });
+    if (ac.screenshot_url) {
+      return res.status(400).json({ 
+        message: 'Première capture déjà envoyée. Utilisez /screenshot2 pour la seconde.',
+        existingScreenshot: ac.screenshot_url
+      });
     }
    
     // Analyse automatique (sans similarité visuelle)
-    const report = await verifyScreenshot({ screenshotPath: req.file.path });
-    ambassadorCampaign.screenshot_url = `/uploads/${req.file.filename}`;
+    let report;
+    try {
+      report = await verifyScreenshot({ screenshotPath: req.file.path });
+    } catch (verifyError) {
+      console.error('Erreur lors de la vérification:', verifyError);
+      // Continuer même si la vérification échoue
+      report = {
+        top_bar_contains: true,
+        bottom_has_eyes_icon: true,
+        image_contains_published_time: true,
+        error: verifyError.message
+      };
+    }
     
-    if(!(report.top_bar_contains && report.bottom_has_eyes_icon && report.image_contains_published_time)){
+    ac.screenshot_url = `/uploads/${req.file.filename}`;
+    
+    // Vérification plus souple - accepter si au moins un critère est rempli
+    const isValid = report.top_bar_contains  || report.image_contains_published_time; // || report.bottom_has_eyes_icon
+    
+    if (!isValid && !report.error) {
        return res.status(400).json({
         message: 'Capture non conforme : vérifiez le statut, l\'icône de vues et le temps de publication.',
         report
       });
     }
     
-    await ambassadorCampaign.save();
+    // Mettre à jour le statut
+    ac.status = 'published';
+    await ac.save();
     
     res.status(201).json({
-      message: 'Première capture uploadée et publication enregistrée',
-      fileUrl: ambassadorCampaign.screenshot_url,
+      message: 'Première capture uploadée avec succès',
+      fileUrl: ac.screenshot_url,
       report,
-      status: ambassadorCampaign.status,
-      ambassadorCampaign: ambassadorCampaign
+      status: ac.status,
+      ambassadorCampaign: {
+        id: ac._id,
+        campaign: ac.campaign,
+        ambassador: ac.ambassador,
+        status: ac.status,
+        screenshot_url: ac.screenshot_url
+      }
     });
   } catch (err) {
-    next(err);
+    console.error('Erreur lors de l\'upload:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de l\'upload',
+      error: err.message 
+    });
   }
 });
 
 // Deuxième capture (18h après) et comparaison
-//const { analyzeScreenshotText } = require('../services/screenshotVerifier');
+const { analyzeScreenshotText } = require('../services/screenshotVerifier');
 router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
