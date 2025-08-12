@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Campaign = require('../models/Campaign');
+const AmbassadorCampaign = require('../models/AmbassadorCampaign');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { changeCampaignStatus } = require('../controllers/campaignController');
@@ -11,10 +12,59 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
     const { page = 1, pageSize = 10, search = '' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     const ambassador = await User.findById(req.user.id);
+    if(!ambassador) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambassadeur non trouvé'
+      });
+    }
+    // Trouver les campagnes où l'ambassadeur a déjà participé
+    const ambassadorCampaigns = await AmbassadorCampaign.find({
+      ambassador: req.user.id
+    }).distinct('campaign');
+    const publicationsValidated = await AmbassadorCampaign.find({
+      ambassador: req.user.id,
+      status: 'validated'
+    });
+    const publications = await AmbassadorCampaign.find({
+      ambassador: req.user.id,
+    });
+    //Gestion de la campagne test
+    if(publicationsValidated.length == 0||ambassador.view_average ==0) {
+      if(publications.length > 0) {
+        return res.status(200).json({
+          data: [],
+          totalCount: 0,
+          campaign_test_ongoing: true,
+          page: Number(page),
+          pageSize: 0,
+          success: true,
+          message: 'Vous devez avoir au moins une publication validée pour accéder à cette page'
+        });
+      }
+      const ad = await Campaign.findOne({
+        campaign_test: true,
+      }).populate('advertiser', 'name');
+      const adObject = {...ad.toObject()
+        ,expected_views: 100,
+        expected_earnings: 0
+        }; 
+      return res.status(200).json({
+        data: [adObject],
+        totalCount: 1,
+        campaign_test_ongoing: true,
+        page: Number(page),
+        pageSize: 0,
+      });
+    }
+    console.log('Campagnes déjà participées par l\'ambassadeur:', ambassadorCampaigns);
+    
     const query = {
       status: 'active',
       end_date: { $gte: new Date() },
       $expr: { $gt: ["$expected_views", "$number_views_assigned"] },
+      // Exclure les campagnes où l'ambassadeur a déjà participé
+      _id: { $nin: ambassadorCampaigns },
       $or: [
         { 'target_location': { $elemMatch: { value: ambassador.location.city } }},
         { 'target_location': { $elemMatch: { value: ambassador.location.region } } },
@@ -23,14 +73,14 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
     if (search) {
       query.title = { $regex: search, $options: 'i' };
     }
-    // Critère de zone : ville ou région avec $elemMatch
     
-    // On combine les campagnes trouvées par query et celles par radius
+    // Compter le total des campagnes disponibles (pour la pagination)
+    const total = await Campaign.countDocuments(query);
+    
+    // Trouver les campagnes disponibles avec pagination
     let campaigns = await Campaign.find(query).populate('advertiser', 'name')
       .skip(skip)
       .limit(parseInt(pageSize));
-   
-    const total = campaigns.length;
     const result = campaigns.map(c => ({
       id: c._id,
       title: c.title,
@@ -48,7 +98,8 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
       cpc: c.cpc,
 
     }));
-    console.log(result);
+    
+    console.log(`Ambassadeur ${req.user.id}: ${total} campagnes disponibles, ${campaigns.length} retournées`);
     
     res.json({
       totalCount: total,

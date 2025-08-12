@@ -42,7 +42,7 @@ const settingsSchema = new mongoose.Schema({
     },
     minCampaignAmount: {
       type: Number,
-      min: 5000,
+      min: 100,
       default: 10000
     },
     maxCampaignAmount: {

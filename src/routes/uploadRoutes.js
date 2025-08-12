@@ -23,38 +23,40 @@ const imageHash = require('image-hash');
 // Première capture (statut semi-validé)
 router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, res, next) => {
   try {
+    const { campaign } = req.params;
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier envoyé' });
     }
-    
-    const { campaign } = req.params;
     const userId = req.user.id || req.user._id;
-    
-    console.log('Upload screenshot - Campaign ID:', campaign, 'User ID:', userId);
-    
     // Trouver la campagne
     const campaignDoc = await Campaign.findById(campaign);
     if (!campaignDoc) {
       return res.status(404).json({ message: 'Campagne non trouvée' });
     }
-    
+    if(campaignDoc.expected_views == campaignDoc.number_views_assigned) {
+      return res.status(400).json({ message: 'Le nombre d\'attributions pour cette campagne est atteint pour le moment!' });
+    }
+    const ambassador = await User.findById(userId);
+    if(!ambassador) {
+      return res.status(404).json({ message: 'Ambassadeur non trouvé' });
+    }
     // Trouver ou créer l'attribution ambassadeur-campagne
     let ac = await AmbassadorCampaign.findOne({ 
       campaign: campaign, 
       ambassador: userId 
-    });
+    }).populate('campaign', 'expected_views number_views_assigned');
     
     if (!ac) {
       // Créer une nouvelle attribution si elle n'existe pas
       ac = new AmbassadorCampaign({
         campaign: campaign,
         ambassador: userId,
-        status: 'pending'
+        status: 'published'
       });
     }
     
     // Si une première capture existe déjà, refuser
-    if (ac.screenshot_url) {
+    if (ac.status !== 'published') {
       return res.status(400).json({ 
         message: 'Première capture déjà envoyée. Utilisez /screenshot2 pour la seconde.',
         existingScreenshot: ac.screenshot_url
@@ -75,9 +77,12 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
         error: verifyError.message
       };
     }
-    
-    ac.screenshot_url = `/uploads/${req.file.filename}`;
-    
+    const path = require('path');
+    const filePath = path.join('uploads', req.file.filename);
+    const relPath = '/' + filePath.replace(/\\/g, '/');
+    const baseUrl = process.env.MEDIA_BASE_URL || (req.protocol + '://' + req.get('host'));
+    ac.screenshot_url = `${baseUrl}${relPath}`;
+    console.log('Screenshot URL:', ac.screenshot_url);
     // Vérification plus souple - accepter si au moins un critère est rempli
     const isValid = report.top_bar_contains  || report.image_contains_published_time; // || report.bottom_has_eyes_icon
     
@@ -90,6 +95,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     
     // Mettre à jour le statut
     ac.status = 'published';
+    ac.target_views = ambassador.view_average < (campaignDoc.expected_views - campaignDoc.number_views_assigned) ? ambassador.view_average : (campaignDoc.expected_views - campaignDoc.number_views_assigned)
     await ac.save();
     
     res.status(201).json({
@@ -127,61 +133,41 @@ router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), a
     if (!ac.screenshot_url) {
       return res.status(400).json({ message: 'Première capture manquante.' });
     }
+    console.log('ac.createdAt', ac.createdAt);
+    console.log('Date.now()', Date.now());
+    console.log('ac.createdAt.getTime() + 24 * 60 * 60 * 1000', ac.createdAt.getTime() + 24 * 60 * 60 * 1000);
+    console.log('Date.now() - ac.createdAt.getTime()', Date.now() - ac.createdAt.getTime());
+    console.log('Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000', Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000);
+    console.log('Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000', Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000);
+    if((ac.createdAt.getTime() + 24 * 60 * 60 * 1000) < Date.now()) {
+      return res.status(400).json({ message: 'La première capture a été envoyée il y a plus de 24 heures.' });
+    }
+    let report;
+    try {
+      report = await verifyScreenshot({ screenshotPath: req.file.path });
+    } catch (verifyError) {
+      console.error('Erreur lors de la vérification:', verifyError);
+      // Continuer même si la vérification échoue
+      report = {
+        top_bar_contains: true,
+        bottom_has_eyes_icon: true,
+        image_contains_published_time: true,
+        error: verifyError.message
+      };
+    }
+    console.log('report', report);
     // Stocke la deuxième capture
-    ac.screenshot_url2 = `/uploads/${req.file.filename}`;
-    // Compare les deux captures (hash perceptuel)
-    const getHash = (file) => new Promise((resolve, reject) => {
-      imageHash.hash(file, 8, 'hex', (err, hash) => {
-        if (err) reject(err); else resolve(hash);
-      });
-    });
-    const hash1 = await getHash(`uploads/${ac.screenshot_url.replace('/uploads/', '')}`);
-    const hash2 = await getHash(req.file.path);
-    // OCR pour extraire le nombre de vues sur chaque capture
-    const ocr1 = await analyzeScreenshotText(`uploads/${ac.screenshot_url.replace('/uploads/', '')}`);
-    const ocr2 = await analyzeScreenshotText(req.file.path);
-    // Extraction du nombre de vues (ex: "12 vues" ou "vu par 34")
-    const extractViews = txt => {
-      const match = txt.match(/([0-9]{1,4})\s*(vues|vu par)/i);
-      return match ? parseInt(match[1], 10) : null;
-    };
-    const views1 = extractViews(ocr1);
-    const views2 = extractViews(ocr2);
-    // Met à jour le nombre de vues de la deuxième capture
-    if (views2 !== null) {
-      ac.views_count = views2;
-      // Met à jour le montant gagné (CPV)
-      // On suppose que la campagne est toujours liée à ac.campaign
-      const campaign = await require('../models/Campaign').findById(ac.campaign);
-      if (campaign && campaign.cpv) {
-        ac.amount_earned = Math.round(views2 * campaign.cpv * 0.75); // 75% pour l'ambassadeur
-      }
-    }
-    // Score de similarité simple (distance de Hamming)
-    const hamming = (a, b) => a.split('').reduce((acc, c, i) => acc + (c !== b[i] ? 1 : 0), 0);
-    const hashDistance = hamming(hash1, hash2);
-    // Logique de validation
-    let status = 'manual_review';
-    if (hashDistance <= 10 && (views2 === null || views1 === null || views2 >= views1)) {
-      status = 'validated';
-      // Créditer la balance de l'ambassadeur si la campagne est validée
-      const User = require('../models/User');
-      const ambassador = await User.findById(ac.ambassador);
-      if (ambassador) {
-        ambassador.balance += ac.amount_earned || 0;
-        //await ambassador.save();
-      }
-    }
-    ac.status = status;
+    const path = require('path');
+    const filePath = path.join('uploads', req.file.filename);
+    const relPath = '/' + filePath.replace(/\\/g, '/');
+    const baseUrl = process.env.MEDIA_BASE_URL || (req.protocol + '://' + req.get('host'));
+    ac.screenshot_url2 = `${baseUrl}${relPath}`;
+    ac.status = "submitted";
+    ac.submittedAt = new Date();
     await ac.save();
     res.status(201).json({
       message: 'Deuxième capture uploadée',
       fileUrl: ac.screenshot_url2,
-      hash1,
-      hash2,
-      hashDistance,
-      views1,
-      views2,
       status: ac.status,
       ambassadorCampaign: ac
     });
@@ -193,6 +179,7 @@ router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), a
 
 // Route statique pour obtenir un fichier uploadé
 const path = require('path');
+const User = require('../models/User');
 router.get('/:filename', (req, res) => {
   const filePath = path.join(__dirname, '../../uploads', req.params.filename);
   res.sendFile(filePath, err => {

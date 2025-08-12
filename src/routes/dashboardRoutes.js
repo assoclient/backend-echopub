@@ -10,6 +10,15 @@ router.get('/stats', auth, role('admin', 'superadmin'), dashboardController.getD
 // Récupérer les statistiques du dashboard pour un annonceur
 router.get('/advertiser-stats', auth, role('advertiser'), dashboardController.getAdvertiserDashboardStats);
 
+// Récupérer les statistiques des gains pour un ambassadeur
+router.get('/ambassador-gains', auth, role('ambassador'), dashboardController.getAmbassadorGainsStats);
+
+// Récupérer les transactions paginées d'un ambassadeur
+router.get('/ambassador-transactions', auth, role('ambassador'), dashboardController.getAmbassadorTransactions);
+
+// Récupérer le profil d'un ambassadeur
+router.get('/ambassador-profile', auth, role('ambassador'), dashboardController.getAmbassadorProfile);
+
 // Récupérer les rapports détaillés (admin seulement)
 router.get('/reports', auth, role('admin', 'superadmin'), dashboardController.getDetailedReports);
 

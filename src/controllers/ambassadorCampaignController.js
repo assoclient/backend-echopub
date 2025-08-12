@@ -27,6 +27,8 @@ exports.deleteAmbassadorCampaign = async (req, res, next) => {
 
 // Liste paginée et recherche campagnes ambassadeur (par titre campagne)
 const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+const Transaction = require('../models/Transaction');
+const User = require('../models/User');
 
 exports.getAllAmbassadorCampaigns = async (req, res, next) => {
   try {
@@ -114,15 +116,31 @@ exports.createAmbassadorCampaign = async (req, res, next) => {
     next(err);
   }
 };
-
+async function calculateAverageViews(ambassador) {
+  const allPublications = await AmbassadorCampaign.find({ ambassador: ambassador._id,status: 'validated' });
+  const totalViews = allPublications.reduce((sum, pub) => sum + (pub.views_count || 0), 0);
+  const totalPublications = allPublications.length;
+  const averageViews = totalViews / totalPublications || 0;
+  const Ambassador = await User.findById(ambassador._id);
+  Ambassador.view_average = averageViews;
+  await Ambassador.save();
+  return averageViews;
+}
 // Valider une publication d'ambassadeur
 exports.validatePublication = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { views_count, comment } = req.body;
+    if (!views_count) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le nombre de vues est requis'
+      });
+    }
     
     const publication = await AmbassadorCampaign.findById(id)
       .populate('ambassador', 'name')
-      .populate('campaign', 'title');
+      .populate('campaign', 'title expected_views cpv_ambassador');
     
     if (!publication) {
       return res.status(404).json({
@@ -130,8 +148,14 @@ exports.validatePublication = async (req, res, next) => {
         message: 'Publication non trouvée'
       });
     }
-    
-    // Vérifier si la publication est déjà validée
+    const ambassador = await User.findById(publication.ambassador);
+    if(!ambassador) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambassadeur non trouvé'
+      });
+    }
+
     if (publication.status === 'validated') {
       return res.status(400).json({
         success: false,
@@ -145,15 +169,35 @@ exports.validatePublication = async (req, res, next) => {
         success: false,
         message: 'Les deux preuves (captures) doivent être fournies pour valider la publication'
       });
-    }
+    } 
     
+    const cpv_ambassador = publication.campaign.cpv_ambassador;
+    if(publication.campaign.campaign_test) {
+      cpv_ambassador = 0;
+    }
+    const amount_earned = publication.target_views > views_count ? views_count * cpv_ambassador*0.8 : publication.target_views * cpv_ambassador;
     // Mettre à jour le statut
     publication.status = 'validated';
     publication.validatedAt = new Date();
     publication.validatedBy = req.user.id;
-    
+    publication.comment = comment;
+    publication.views_count = views_count;
+    publication.amount_earned = amount_earned;
+    ambassador.balance += amount_earned;
+    await Transaction.create({
+      ambassador: ambassador._id,
+      user: ambassador._id,
+      amount: amount_earned,
+      type: 'payment',
+      method: 'cm.echopub',
+      status: 'confirmed',
+      reference: `TXECHO-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}--${publication.campaign._id}`,
+      campaign: publication.campaign._id,
+      description: `Publication validée: ${publication.campaign.title}`
+    });
     await publication.save();
-    
+    await ambassador.save();
+    calculateAverageViews(ambassador);
     // Logger l'activité si le service existe
     try {
       const { logPublicationActivity } = require('../utils/activityLogger');

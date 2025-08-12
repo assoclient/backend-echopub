@@ -11,13 +11,14 @@ const campaignSchema = new mongoose.Schema({
     value: { type: String, required: true },
   }],
   number_views_assigned: { type: Number, default: 0 },
-  expected_views: { type: Number, min: 100 },
+  expected_views: { type: Number, min: 1 },
   cpv: { type: Number, min: 14 ,default: 14 }, // CPV minimum pour l'annonceur
   cpv_ambassador: { type: Number, default:10 }, // CPV pour l'ambassadeur
   start_date: Date,
   end_date: Date,
   budget: Number,
-  status: { type: String, enum: ['draft','submitted', 'active', 'paused', 'completed','stopped'], default: 'draft' },
+  campaign_test: { type: Boolean, default: false },
+  status: { type: String, enum: ['draft','submitted', 'active', 'paused', 'completed'], default: 'draft' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Campaign', campaignSchema);

@@ -107,10 +107,10 @@ exports.updatePaymentSettings = async (req, res) => {
       });
     }
 
-    if (minCampaignAmount < 1000) {
+    if (minCampaignAmount < 100) {
       return res.status(400).json({
         success: false,
-        message: 'Le montant minimum doit être d\'au moins 1000 FCFA'
+        message: 'Le montant minimum doit être d\'au moins 100 FCFA'
       });
     }
 

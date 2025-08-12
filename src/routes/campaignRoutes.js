@@ -37,7 +37,7 @@ router.get('/advertiser/campaigns/:advertiserId', auth, role('advertiser'), camp
 router.post('/', auth, role('advertiser'),upload.single('media'), campaignController.createCampaign);
 
 // Changer le statut d'une campagne
-router.post('/changestatus/:id', auth, campaignController.changeCampaignStatus);
+router.post('/changestatus/:id', auth,role('admin','superadmin','advertiser'), campaignController.changeCampaignStatus);
 
 // Mise à jour d'une campagne (annonceur propriétaire ou admin)
 router.put('/:id', auth,upload.single('media'), (req, res, next) => {
@@ -46,9 +46,9 @@ router.put('/:id', auth,upload.single('media'), (req, res, next) => {
 }, campaignController.updateCampaign);
 
 // Suppression d'une campagne (admin uniquement)
-router.delete('/:id', auth, role('admin','advertiser'), campaignController.deleteCampaign);
+router.delete('/:id', auth, role('admin','advertiser','superadmin'), campaignController.deleteCampaign);
 
 // Détails d'une campagne (DOIT être en dernier)
-router.get('/:id', auth, role('admin','advertiser'), campaignController.getCampaignDetails);
+router.get('/:id', auth, role('admin','advertiser','superadmin'), campaignController.getCampaignDetails);
 
 module.exports = router;

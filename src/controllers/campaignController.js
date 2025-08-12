@@ -123,7 +123,7 @@ exports.changeCampaignStatus = async (req, res, next) => {
     const allowed = {
       draft: ['submitted'],
       submitted: ['active'],
-      active: ['paused', 'completed'],
+      active: ['paused', 'completed'], 
       paused: ['active', 'completed'],
     };
     if (!allowed[current] || !allowed[current].includes(status)) {
@@ -138,20 +138,22 @@ exports.changeCampaignStatus = async (req, res, next) => {
     }
     if (current === 'submitted' && status === 'active') {
       // Seul l'admin peut activer
-      if (!user || user.role !== 'admin') {
+      if (!user || (user.role !== 'admin'&& user.role !== 'superadmin')) {
         return res.status(403).json({ message: 'Seul l\'administrateur peut activer la campagne.' });
       }
     }
     if (current === 'active' && (status === 'paused' || status === 'completed')) {
-      // Seul l'annonceur propriétaire peut mettre en pause ou terminer
-      if (!user || user.role !== 'advertiser' || user.id.toString() !== campaign.advertiser.toString()) {
-        return res.status(403).json({ message: 'Seul l\'annonceur peut modifier le statut de cette campagne.' });
+      // L'annonceur propriétaire ou l'admin peut mettre en pause ou terminer
+      if (!user || (user.role !== 'advertiser' && user.role !== 'admin') || 
+          (user.role === 'advertiser' && user.id.toString() !== campaign.advertiser.toString())) {
+        return res.status(403).json({ message: 'Accès non autorisé pour modifier le statut de cette campagne.' });
       }
     }
     if (current === 'paused' && status === 'active') {
-      // Seul l'annonceur propriétaire peut réactiver
-      if (!user || user.role !== 'advertiser' || user.id.toString() !== campaign.advertiser.toString()) {
-        return res.status(403).json({ message: 'Seul l\'annonceur peut réactiver cette campagne.' });
+      // L'annonceur propriétaire ou l'admin peut réactiver
+      if (!user || (user.role !== 'advertiser' && user.role !== 'admin') || 
+          (user.role === 'advertiser' && user.id.toString() !== campaign.advertiser.toString())) {
+        return res.status(403).json({ message: 'Accès non autorisé pour réactiver cette campagne.' });
       }
     }
     if (current === 'paused' && status === 'completed') {
@@ -354,7 +356,11 @@ exports.updateCampaign = async (req, res, next) => {
   try {
     const { id } = req.params;
     let update = { ...req.body };
-
+    let campaign = await Campaign.findById(id); 
+    const Settings = require('../models/Settings');
+    const settings = await Settings.findOne()
+    if (!campaign) return res.status(404).json({ message: 'Campagne non trouvée' });
+    if(campaign.status !== 'draft') return res.status(400).json({ message: 'La campagne n\'est pas en état de brouillon' });
     // Si multipart, le client peut envoyer un champ 'data' JSON et un fichier 'media'
     if (req.is('multipart/form-data') && req.body.data) {
       
@@ -372,14 +378,16 @@ exports.updateCampaign = async (req, res, next) => {
       const filePath = path.join('uploads', req.file.filename);
       const relPath = '/' + filePath.replace(/\\/g, '/');
       const baseUrl = process.env.MEDIA_BASE_URL || (req.protocol + '://' + req.get('host'));
-      const ext = path.extname(req.file.originalname);
       media_url = `${baseUrl}${relPath}`;
       update.media_url = media_url;
-    }
+    } 
     if(typeof update.target_location === 'string') {
-        update.target_location = JSON.parse(update.target_location);
-      }
-    const campaign = await Campaign.findByIdAndUpdate(id, update, { new: true });
+      update.target_location = JSON.parse(update.target_location);
+    }
+    const expected_views = Math.floor(update.budget / settings.payment.cpv);
+    campaign = await Campaign.findByIdAndUpdate(id, update, { new: true });
+    campaign.expected_views = expected_views;
+    await campaign.save();
     if (!campaign) return res.status(404).json({ message: 'Campagne non trouvée' });
     res.json({ message: 'Campagne modifiée', campaign });
   } catch (err) {
@@ -400,29 +408,129 @@ exports.deleteCampaign = async (req, res, next) => {
 };
 // Contrôleur Campaign
 
-// Liste paginée et recherche campagnes
+// Liste paginée et recherche campagnes avec statistiques
 exports.getAllCampaigns = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 10, search = '' } = req.query;
-    const query = search
-      ? {
-          $or: [
-            { title: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
-          ]
-        }
-      : {};
-    const count = await require('../models/Campaign').countDocuments(query);
-    const docs = await require('../models/Campaign')
+    const { page = 1, pageSize = 10, search = '', advertiser = '', status = '', sortBy = 'createdAt' } = req.query;
+    
+    // Debug logging
+    console.log('🔍 getAllCampaigns - Query params:', { page, pageSize, search, advertiser, status, sortBy });
+    
+    // Construire la requête MongoDB
+    let query = {};
+    
+    // Filtre de recherche
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Filtre par annonceur
+    if (advertiser) {
+      // Rechercher par nom d'annonceur (après population)
+      // On va d'abord récupérer les campagnes puis filtrer côté serveur
+    }
+    
+    // Filtre par statut
+    if (status) {
+      query.status = status;
+    }
+    
+    console.log('🔍 getAllCampaigns - MongoDB query:', JSON.stringify(query, null, 2));
+    
+    const Campaign = require('../models/Campaign');
+    const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+    
+    // Compter le total avec les filtres de base
+    const count = await Campaign.countDocuments(query);
+    console.log('🔍 getAllCampaigns - Total count:', count);
+    
+    // Construire la requête de tri
+    let sortQuery = {};
+    switch (sortBy) {
+      case 'budget':
+        sortQuery.budget = -1;
+        break;
+      case 'views':
+        sortQuery.expected_views = -1;
+        break;
+      case 'clicks':
+        sortQuery.expected_views = -1;
+        break;
+      case 'advertiser':
+        sortQuery.advertiser = 1;
+        break;
+      case 'createdAt':
+      default:
+        sortQuery.createdAt = -1;
+    }
+    
+    // Ajouter le tri par statut en priorité
+    sortQuery = { status: -1, ...sortQuery };
+    
+    const campaigns = await Campaign
       .find(query)
+      .populate('advertiser', 'name')
       .skip((page - 1) * pageSize)
-      .limit(Number(pageSize));
-    res.json({
+      .limit(Number(pageSize))
+      .sort(sortQuery)
+      .lean();
+    
+    console.log('🔍 getAllCampaigns - Found campaigns:', campaigns.length);
+
+    // Ajouter les statistiques et transactions pour chaque campagne
+    let campaignsWithStats = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const publications = await AmbassadorCampaign.find({ campaign: campaign._id });
+        const totalViews = publications.reduce((sum, pub) => sum + (pub.views_count || 0), 0);
+        const totalClicks = publications.reduce((sum, pub) => sum + (pub.clicks_count || 0), 0);
+        const ambassadorCount = publications.length;
+
+        // Récupérer la transaction associée à cette campagne
+        const Transaction = require('../models/Transaction');
+        const transaction = await Transaction.findOne({ 
+          campaign: campaign._id, 
+          type: 'deposit' 
+        }).lean();
+
+        return {
+          ...campaign,
+          advertiser: campaign.advertiser?.name || 'Annonceur inconnu',
+          views: totalViews,
+          clicks: totalClicks,
+          ambassadorCount,
+          transaction: transaction || null
+        };
+      })
+    );
+
+    // Appliquer le filtre par annonceur après population
+    if (advertiser) {
+      campaignsWithStats = campaignsWithStats.filter(campaign => 
+        campaign.advertiser && campaign.advertiser.toLowerCase().includes(advertiser.toLowerCase())
+      );
+      console.log('🔍 getAllCampaigns - Après filtre annonceur:', campaignsWithStats.length);
+    }
+
+    // Debug logging pour la réponse
+    console.log('🔍 getAllCampaigns - Response data:', {
       totalCount: count,
       page: Number(page),
-      pageSize: docs.length,
-      data: docs
+      pageSize: campaignsWithStats.length,
+      dataLength: campaignsWithStats.length,
+      filtersApplied: { search, advertiser, status, sortBy }
     });
+
+    // Retourner la réponse avec le bon statut
+    return res.status(200).json({
+      totalCount: count,
+      page: Number(page),
+      pageSize: campaignsWithStats.length,
+      data: campaignsWithStats
+    });
+    
   } catch (err) {
     next(err);
   }
@@ -430,9 +538,6 @@ exports.getAllCampaigns = async (req, res, next) => {
 
 
 const Campaign = require('../models/Campaign');
-
-const path = require('path');
-const fs = require('fs');
 
 exports.createCampaign = async (req, res, next) => {
   try {

@@ -29,6 +29,7 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const ambassadorStatusRoutes = require('./routes/ambassadorStatusRoutes');
 
 app.use('/api/users', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
@@ -38,6 +39,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/ambassador-publications', ambassadorStatusRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running');

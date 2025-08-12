@@ -3,6 +3,7 @@ const Campaign = require('../models/Campaign');
 const Transaction = require('../models/Transaction');
 const Activity = require('../models/Activity');
 const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+const { default: mongoose } = require('mongoose');
 
 // Récupérer les statistiques du dashboard
 exports.getDashboardStats = async (req, res) => {
@@ -533,6 +534,164 @@ exports.getDetailedReports = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des rapports',
+      error: error.message
+    });
+  }
+}; 
+
+exports.getAmbassadorTransactions = async (req, res) => {
+  try {
+    const ambassadorId = req.user.id;
+    const ambassador = await User.findById(ambassadorId);
+    if (!ambassador) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambassadeur non trouvé'
+      });
+    }
+    const page = req.query.page || 1;
+    const pageSize = req.query.pageSize || 10;
+    const skip = (parseInt(page) - 1) * parseInt(pageSize);
+    const transactions = await Transaction.find({ ambassador: ambassadorId, 
+      type: { $in: ['payment', 'withdrawal'] },status: 'confirmed'}).populate('campaign', 'title')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(pageSize));
+    const totalCount = await Transaction.countDocuments({ ambassador: ambassadorId, 
+      type: { $in: ['payment', 'withdrawal'] },status: 'confirmed' });
+    res.json({
+      success: true,
+      page: Number(page),
+      pageSize: transactions.length,
+      data: transactions,
+      pagination: {
+        page: Number(page),
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNext: skip + pageSize < totalCount,
+        hasPrev: Number(page) > 1
+      }
+    });
+  }
+  catch (error) {
+    console.error('Erreur lors de la récupération des transactions ambassadeur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des transactions',
+      error: error.message
+    });
+  }
+};
+// Récupérer les statistiques des gains pour un ambassadeur
+exports.getAmbassadorGainsStats = async (req, res) => {
+  try {
+    const ambassadorId = req.user.id;
+    const ambassador = await User.findById(ambassadorId);
+    if (!ambassador) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambassadeur non trouvé'
+      });
+    }
+    // Récupérer toutes les publications validées de l'ambassadeur
+    const validatedPublications = await AmbassadorCampaign.find({
+      ambassador: ambassadorId,
+      status: 'validated'
+    })
+    .populate('campaign', 'title')
+    .sort({ createdAt: -1 });
+
+    
+
+   
+
+    // Calculer le solde disponible
+    const availableBalance = ambassador.balance;
+
+    // Statistiques générales
+    const totalViews = validatedPublications.reduce((sum, pub) => sum + (pub.views_count || 0), 0);
+    const totalPublications = validatedPublications.length;
+
+    
+
+    
+
+   
+
+    const gainsStats = {
+      solde: availableBalance,
+
+      totalVues: totalViews,
+      totalPublications,
+ 
+    };
+
+    res.json({
+      success: true,
+      data: gainsStats
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération des gains ambassadeur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des gains',
+      error: error.message
+    });
+  }
+};
+
+// Récupérer le profil d'un ambassadeur
+exports.getAmbassadorProfile = async (req, res) => {
+  try {
+    const ambassadorId = req.user.id;
+    
+    const ambassador = await User.findById(ambassadorId)
+      .select('-password')
+      .lean();
+    
+    if (!ambassador) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ambassadeur non trouvé'
+      });
+    }
+    // Calculer quelques statistiques de profil
+    const totalPublications = await AmbassadorCampaign.countDocuments({
+      ambassador: ambassadorId,
+      status: 'validated'
+    });
+
+    const totalViews = await AmbassadorCampaign.aggregate([
+      { $match: { ambassador: new mongoose.Types.ObjectId(ambassadorId), status: 'validated' } },
+      { $group: { _id: null, total: { $sum: '$views_count' } } }
+    ]);
+console.log('totalViews',totalViews);
+    const totalEarnings = await AmbassadorCampaign.aggregate([
+      { $match: { ambassador: new mongoose.Types.ObjectId(ambassadorId), status: 'validated' } },
+      { $group: { _id: null, total: { $sum: '$amount_earned' } } }
+    ]);
+
+    const profileData = {
+      ...ambassador,
+      stats: {
+        totalPublications,
+        totalViews: totalViews[0]?.total || 0,
+        totalEarnings: totalEarnings[0]?.total || 0
+      }
+    };
+
+    res.json({
+      success: true,
+      data: profileData
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération du profil ambassadeur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération du profil',
       error: error.message
     });
   }
