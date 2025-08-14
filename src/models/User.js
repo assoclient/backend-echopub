@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema({
   contacts_count: Number, // pour les ambassadeurs
   balance: { type: Number, default: 0 }, // Solde actuel de l'utilisateur
   isValid:{type:Boolean,default:true},
+  ageRange:String,
+  gender:String,
   audience:
     {
       city:[{pourcentage:Number,value:String}],

@@ -5,7 +5,7 @@ const { logUserActivity, ACTIVITY_TYPES } = require('../utils/activityLogger');
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role, whatsapp_number, location, contacts_count, audience } = req.body;
+    const { name, email,ageRange,gender,  phone, password, role, whatsapp_number, location, contacts_count, audience } = req.body;
     if(email){
       const existing = await User.findOne({ email });
       if (existing) return res.status(400).json({ message: 'Email déjà utilisé' });
@@ -15,8 +15,10 @@ exports.register = async (req, res, next) => {
       if (existing) return res.status(400).json({ message: 'Numéro de téléphone déjà utilisé' });
     }
     const hash = await bcrypt.hash(password, 10);
+    console.log(ageRange,gender);
     const user = await User.create({
-      name, email, phone, password: hash, role, whatsapp_number, location, contacts_count, audience
+      name, email, ageRange,
+      gender, phone, password: hash, role, whatsapp_number, location, contacts_count, audience
     });
     
     // Logger l'activité selon le rôle

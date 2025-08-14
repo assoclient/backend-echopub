@@ -10,7 +10,7 @@ const role = require('../middleware/role');
 
 // Récupérer toutes les transactions (admin seulement)
 router.get('/', auth,
-  role(['admin', 'superadmin']), 
+  role('admin', 'superadmin'), 
   transactionController.getAllTransactions
 );
 
@@ -33,13 +33,13 @@ router.get('/status/:reference', auth,
 
 // Mettre à jour une transaction (admin seulement)
 router.put('/:id', auth,
-  role(['admin', 'superadmin']), 
+  role('admin', 'superadmin'), 
   transactionController.updateTransaction
 );
 
 // Supprimer une transaction (admin seulement)
 router.delete('/:id', auth,
-  role(['admin', 'superadmin']), 
+    role('admin', 'superadmin'), 
   transactionController.deleteTransaction
 );
 
