@@ -30,6 +30,7 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy application source
 COPY --from=builder /app/node_modules ./node_modules
 COPY src/ ./src/
+COPY .env ./
 RUN mkdir -p uploads
 
 # Create necessary directories
