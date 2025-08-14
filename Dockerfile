@@ -30,11 +30,10 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy application source
 COPY --from=builder /app/node_modules ./node_modules
 COPY src/ ./src/
-COPY uploads/ ./uploads/
+RUN mkdir -p uploads
 
 # Create necessary directories
-RUN mkdir -p uploads/screenshots uploads/campaigns && \
-    chown -R nodejs:nodejs /app
+RUN  chown -R nodejs:nodejs /app
 
 # Switch to non-root user
 USER nodejs
