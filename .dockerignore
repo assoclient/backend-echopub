@@ -187,7 +187,6 @@ __tests__/
 *.spec.js
 
 # Development scripts
-src/scripts/
 test-*.js
 
 # Postman collections
