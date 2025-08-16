@@ -19,7 +19,7 @@ router.post('/', auth,
   role('advertiser'), 
   transactionController.createTransaction
 );
-
+router.get('callback-campay',transactionController.withdrawalWebhook)
 // Retrait d'argent (ambassadeurs seulement)
 router.post('/withdraw', auth,
   role('ambassador'), 
@@ -45,6 +45,10 @@ router.delete('/:id', auth,
 
 // Récupérer les transactions d'un utilisateur spécifique
 router.get('/user/:userId', auth,
+  transactionController.getAllTransactions
+);
+// Récupérer les transactions d'un utilisateur spécifique
+router.get('/my-transactions', auth,
   transactionController.getAllTransactions
 );
 

@@ -552,7 +552,7 @@ exports.getAmbassadorTransactions = async (req, res) => {
     const page = req.query.page || 1;
     const pageSize = req.query.pageSize || 10;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
-    const transactions = await Transaction.find({ ambassador: ambassadorId, 
+    const transactions = await Transaction.find({ user: ambassadorId, 
       type: { $in: ['payment', 'withdrawal'] },status: 'confirmed'}).populate('campaign', 'title')
       .sort({ createdAt: -1 })
       .skip(skip)

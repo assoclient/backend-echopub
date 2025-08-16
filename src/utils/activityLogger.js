@@ -129,11 +129,17 @@ const logPaymentActivity = async (transaction, additionalMetadata = {}) => {
 
   return await createActivity(ACTIVITY_TYPES.PAYMENT_RECEIVED, null, null, metadata, references);
 };
-
+const getNumberOfDayBeetweenDates = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = Math.abs(end - start);
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 module.exports = {
   ACTIVITY_TYPES,
   createActivity,
   logCampaignActivity,
   logUserActivity,
-  logPaymentActivity
+  logPaymentActivity,
+  getNumberOfDayBeetweenDates
 }; 

@@ -58,6 +58,7 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
       });
     }
     console.log('Campagnes déjà participées par l\'ambassadeur:', ambassadorCampaigns);
+    console.log(new Date());
     
     const query = {
       status: 'active',
@@ -76,7 +77,7 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
     
     // Compter le total des campagnes disponibles (pour la pagination)
     const total = await Campaign.countDocuments(query);
-    
+    const fromUrl = process.env.FRONTEND_URL || '';
     // Trouver les campagnes disponibles avec pagination
     let campaigns = await Campaign.find(query).populate('advertiser', 'name')
       .skip(skip)
@@ -92,7 +93,8 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
       location_type: c.location_type,
       target_link: c.target_link,
       media_url: c.media_url,
-      expected_views: ambassador.view_average < (c.expected_views - c.number_views_assigned) ? ambassador.view_average : (c.expected_views - c.number_views_assigned),
+      shortLink:fromUrl + '/redirect/' +c.short_linkId,
+      expected_views: ambassador.view_average < (c.expected_views - c.number_views_assigned) ? Math.round(ambassador.view_average) : (c.expected_views - c.number_views_assigned),
       expected_earnings:Math.round((ambassador.view_average < (c.expected_views - c.number_views_assigned) ? ambassador.view_average : (c.expected_views - c.number_views_assigned)) * c.cpv_ambassador),
       cpv: c.cpv_ambassador,
       cpc: c.cpc,

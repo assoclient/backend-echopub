@@ -27,6 +27,7 @@ exports.deleteAmbassadorCampaign = async (req, res, next) => {
 
 // Liste paginée et recherche campagnes ambassadeur (par titre campagne)
 const AmbassadorCampaign = require('../models/AmbassadorCampaign');
+const Campaign = require('../models/Campaign');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 
@@ -222,5 +223,30 @@ exports.validatePublication = async (req, res, next) => {
       message: 'Erreur lors de la validation de la publication',
       error: error.message
     });
+  }
+};
+exports.updatClicksCount = async (req, res, next) => {
+  try {
+    const { sortLinkId,ambassador } = req.params;
+    const campaign = await Campaign.findOne({ short_linkId: sortLinkId });
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campagne non trouvée' });
+    }
+    const ambassadeurData = await User.findById(ambassador);
+    if (!ambassadeurData) {
+      return res.status(404).json({ message: 'Ambassadeur non trouvé' });
+    }
+    console.log(`Mise à jour des clics pour la campagne ${campaign.title} et l'ambassadeur ${ambassadeurData.name}`);
+    
+    const publication = await AmbassadorCampaign.findOne({campaign: campaign._id, ambassador: ambassadeurData._id });
+    if (!publication) {
+      return res.status(404).json({ message: 'Publication non trouvée' });
+    }
+    publication.clicks_count +=1;
+    await publication.save();
+    res.json({ message: 'Nombre de clics mis à jour', redirectUrl: campaign.target_link });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des clics:', error);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour des clics', error: error.message });
   }
 };

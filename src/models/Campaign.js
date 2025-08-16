@@ -17,6 +17,7 @@ const campaignSchema = new mongoose.Schema({
   start_date: Date,
   end_date: Date,
   budget: Number,
+  short_linkId: { type: String, default: null}, // ID pour le lien court
   campaign_test: { type: Boolean, default: false },
   status: { type: String, enum: ['draft','submitted', 'active', 'paused', 'completed'], default: 'draft' },
 }, { timestamps: true });

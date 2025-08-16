@@ -1,4 +1,5 @@
 // Détails d'une campagne avec stats globales et liste des publications
+//const  nanoid = require("nanoid");
 exports.getCampaignDetails = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -314,18 +315,32 @@ exports.getMyCampaigns = async (req, res, next) => {
         }
       }
     ]);
+    const statsCampaigns = await Publication.aggregate([
+      { $match: { campaign: { $in: campaignIds } } },
+      { $group: {
+          _id: "$campaign",
+          totalClick: { $sum: "$clicks_count" },
+
+        }
+      }
+    ]);
     
     const statsMap = {};
     stats.forEach(s => {
       statsMap[s._id.toString()] = s;
     });
+    const statsClicksMap = {};
+    statsCampaigns.forEach(s => {
+      statsClicksMap[s._id.toString()] = s;
+    });
     
     const result = campaigns.map(c => {
       const s = statsMap[c._id.toString()] || {};
+      const sc = statsClicksMap[c._id.toString()] || {};
       return {
         ...c,
         views: s.totalViews || 0,
-        clicks: s.totalClick || 0,
+        clicks: sc.totalClick || 0,
         publications: s.totalPublications || 0,
         spent: s.totalSpent || 0,
         progress: c.expected_views > 0 ? Math.min(100, Math.round((s.totalViews || 0) / c.expected_views * 100)) : 0
@@ -401,6 +416,25 @@ exports.deleteCampaign = async (req, res, next) => {
     const { id } = req.params;
     const campaign = await Campaign.findByIdAndDelete(id);
     if (!campaign) return res.status(404).json({ message: 'Campagne non trouvée' });
+    // Suppression du média associé si présent
+    if (campaign.media_url) {
+      try {
+        const url = campaign.media_url;
+        // Extraire le chemin local du fichier (suppose que l'URL contient '/uploads/filename')
+        const uploadIndex = url.indexOf('/uploads/');
+        if (uploadIndex !== -1) {
+          const filePath = url.substring(uploadIndex + 1); // retire le slash initial
+          const fs = require('fs');
+          fs.unlink(filePath, (err) => {
+            if (err) {
+              console.warn('Erreur suppression média:', err.message);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Erreur suppression média:', err.message);
+      }
+    }
     res.json({ message: 'Campagne supprimée' });
   } catch (err) {
     next(err);
@@ -493,7 +527,7 @@ exports.getAllCampaigns = async (req, res, next) => {
         const transaction = await Transaction.findOne({ 
           campaign: campaign._id, 
           type: 'deposit' 
-        }).lean();
+        },null,{ sort: { createdAt: -1 } }).lean();
 
         return {
           ...campaign,
@@ -586,6 +620,12 @@ exports.createCampaign = async (req, res, next) => {
     if (!title || !target_link || !target_location || !budget) {
       return res.status(400).json({ message: 'Champs obligatoires manquants' });
     }
+     const fromUrl = process.env.FRONTEND_URL || '';
+     let shortId = '';
+    await (async () => {
+      const { nanoid } = await import("nanoid");
+       shortId = nanoid(7);
+    })();
     
     const campaign = await Campaign.create({
       advertiser,
@@ -600,6 +640,7 @@ exports.createCampaign = async (req, res, next) => {
       start_date,
       end_date,
       budget,
+      short_linkId:shortId,
       expected_views,
       status: 'draft'
     });

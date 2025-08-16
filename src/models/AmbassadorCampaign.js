@@ -13,6 +13,7 @@ const ambassadorCampaignSchema = new mongoose.Schema({
   comment: {type:String,default:null},
   submittedAt: {type:Date,default:null},
   validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  link: { type: String, default: null }, // lien de la publication
   target_views: { type: Number, default: 0 }, // vues attendues pour la campagne : se calcule  en fonction du view average de l'ambassadeur et du( expected_views  - number_views_assigned)
    /* 
   target_views = (expected_views - number_views_assigned)> ambassador.view_average?ambassador.view_average : (expected_views - number_views_assigned);

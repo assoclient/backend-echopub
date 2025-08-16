@@ -78,7 +78,56 @@ exports.getAllTransactions = async (req, res, next) => {
     next(err);
   }
 };
-
+exports.getMyTransactions = async (req, res, next) => {
+  try {
+     res.set('Cache-Control', 'no-store');
+    const { page = 1, pageSize = 100, search = '', type = '', status = '' } = req.query;
+    const user = req.user.id;
+    // Construire la requête de base
+    let query = {};
+    
+    // Filtre par type
+    if (type) {
+      query.type = type;
+    }
+    
+    // Filtre par statut
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filtre par utilisateur
+    if (user) {
+      query.user = user;
+    }
+    
+    // Recherche textuelle
+    if (search) {
+      query.$or = [
+        { type: { $regex: search, $options: 'i' } },
+        { status: { $regex: search, $options: 'i' } },
+        { reference: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const count = await Transaction.countDocuments(query);
+    const docs = await Transaction.find(query)
+      .populate('user', 'name email phone')
+      .populate('campaign', 'title')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(Number(pageSize));
+      
+    return res.status(200).json({
+      totalCount: count,
+      page: Number(page),
+      pageSize: docs.length,
+      data: docs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 
@@ -342,7 +391,7 @@ exports.createTransaction = async (req, res, next) => {
 // Retrait d'argent pour les ambassadeurs (Withdraw)
 exports.withdrawFunds = async (req, res, next) => {
   try {
-    const { phone, amount } = req.body;
+    const { phone, amount,method } = req.body;
     
     if (!phone || !amount) {
       return res.status(400).json({ message: 'Champs obligatoires manquants' });
@@ -388,14 +437,14 @@ exports.withdrawFunds = async (req, res, next) => {
     // Créer la transaction de retrait en base
     const transaction = new Transaction({
       user: user,
+      ambassador: userExists._id,
       type: 'withdrawal',
-      method: 'cm.echopub',
+      method: method||'cm.echopub',
       amount: amount,
       currency: 'XAF',
       reference: reference,
       status: 'pending',
       description: `Retrait de ${amount} FCFA`,
-      
     });
 
     await transaction.save();
@@ -430,6 +479,7 @@ exports.withdrawFunds = async (req, res, next) => {
           transaction: transaction,
           transactionId: camPayResponse.reference,
           status: 'pending',
+          
           success: true,
           note: 'Le retrait sera traité dans les prochaines minutes'
         });
@@ -544,5 +594,29 @@ exports.checkTransactionStatus = async (req, res, next) => {
   } catch (error) {
     console.error('❌ Erreur lors de la vérification du statut:', error);
     next(error);
+  }
+};
+
+// Webhook pour mettre à jour le statut d'une transaction de retrait
+exports.withdrawalWebhook = async (req, res, next) => {
+  try {
+    const { external_reference, reference,status } = req.query;
+    if (!external_reference || !status|| !reference) {
+      return res.status(400).json({ message: 'transactionId et status requis' });
+    }
+    const Transaction = require('../models/Transaction');
+    const transaction = await Transaction.findById({reference:external_reference});
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transaction non trouvée' });
+    }
+    if(status =='SUCCESSFUL') {
+      transaction.status = 'confirmed'; 
+      
+  }
+   transaction.transactionId = reference
+   await transaction.save();
+    res.json({ message: 'Statut de la transaction mis à jour', transaction });
+  } catch (err) {
+    next(err);
   }
 };

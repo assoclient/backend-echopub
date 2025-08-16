@@ -19,4 +19,6 @@ router.delete('/:id', auth, role('admin', 'superadmin'), ambassadorCampaignContr
 // Valider une publication d'ambassadeur (admin seulement)
 router.put('/:id/validate', auth, role('admin', 'superadmin'), ambassadorCampaignController.validatePublication);
 
+router.get('/add-click/:sortLinkId/:ambassador',ambassadorCampaignController.updatClicksCount)
+
 module.exports = router;

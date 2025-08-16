@@ -4,9 +4,10 @@ const { logCampaignActivity, ACTIVITY_TYPES } = require('../utils/activityLogger
 
 // Configuration de la base de données
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/echopub';
+//console.log(`🔗 Connexion à MongoDB: ${process.env.MONGODB_URI}`);
 
 // Fonction pour se connecter à la base de données
-async function connectDB() {
+async function connectDB(MONGODB_URI) {
   try {
     console.log('MONGODB_URI', MONGODB_URI);
     await mongoose.connect(MONGODB_URI, {
@@ -33,7 +34,7 @@ async function closeDB() {
 // Fonction principale pour compléter automatiquement les campagnes
 async function autoCompleteCampaigns() {
   try {
-    await connectDB();
+    //await connectDB();
     console.log('🔄 Début de la vérification automatique des campagnes...');
     
     const now = new Date();
@@ -42,9 +43,12 @@ async function autoCompleteCampaigns() {
     // Trouver toutes les campagnes actives ou en pause dont la date de fin est passée
     const campaignsToComplete = await Campaign.find({
       status: { $in: ['active', 'paused'] },
-      end_date: { $lt: now },
-      // S'assurer que la date de fin existe
-      end_date: { $exists: true, $ne: null }
+      campaign_test: false,
+      end_date: {
+          $exists: true,
+          $ne: null,
+          $lte: new Date(), // doit être passée
+        }
     }).populate('advertiser', 'name');
     
     console.log(`📊 ${campaignsToComplete.length} campagne(s) trouvée(s) à compléter`);

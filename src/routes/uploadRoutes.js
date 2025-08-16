@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/upload');
 const auth = require('../middleware/auth');
-
+const jwt = require('jsonwebtoken');
 // Upload image ou vidéo (authentifié)
 router.post('/', auth, upload.single('file'), (req, res) => {
   if (!req.file) {
@@ -23,6 +23,7 @@ const imageHash = require('image-hash');
 // Première capture (statut semi-validé)
 router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, res, next) => {
   try {
+    const fromUrl = process.env.FRONTEND_URL || '';
     const { campaign } = req.params;
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier envoyé' });
@@ -45,13 +46,16 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
       campaign: campaign, 
       ambassador: userId 
     }).populate('campaign', 'expected_views number_views_assigned');
-    
+     //const numberDays = getNumberOfDayBeetweenDates(campaignDoc.start_date, campaignDoc.end_date)+90;
+    // const token = jwt.sign({ campaign, ambassador }, process.env.JWT_SECRET, { expiresIn: `${numberDays}d` });
     if (!ac) {
+
       // Créer une nouvelle attribution si elle n'existe pas
       ac = new AmbassadorCampaign({
         campaign: campaign,
         ambassador: userId,
-        status: 'published'
+        status: 'published',
+       // link:fromUrl + '/redirect_url/' + token,
       });
     }
     
@@ -133,12 +137,11 @@ router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), a
     if (!ac.screenshot_url) {
       return res.status(400).json({ message: 'Première capture manquante.' });
     }
-    console.log('ac.createdAt', ac.createdAt);
-    console.log('Date.now()', Date.now());
-    console.log('ac.createdAt.getTime() + 24 * 60 * 60 * 1000', ac.createdAt.getTime() + 24 * 60 * 60 * 1000);
-    console.log('Date.now() - ac.createdAt.getTime()', Date.now() - ac.createdAt.getTime());
-    console.log('Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000', Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000);
-    console.log('Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000', Date.now() - ac.createdAt.getTime() < 24 * 60 * 60 * 1000);
+    //console.log(ac.createdAt, moment().tz("Africa/Douala").format("YYYY-MM-DD HH:mm:ss"));
+    /* if (ac.createdAt.getTime() + 12 * 60 * 60 * 1000 > Date.now()) {
+      return res.status(400).json({ message: 'La deuxième capture ne peut être envoyée qu\'après 12 heures.' });
+      
+    } */
     if((ac.createdAt.getTime() + 24 * 60 * 60 * 1000) < Date.now()) {
       return res.status(400).json({ message: 'La première capture a été envoyée il y a plus de 24 heures.' });
     }
@@ -180,6 +183,7 @@ router.post('/screenshot2/:ambassadorCampaignId', auth, upload.single('file'), a
 // Route statique pour obtenir un fichier uploadé
 const path = require('path');
 const User = require('../models/User');
+const { getNumberOfDayBeetweenDates } = require('../utils/activityLogger');
 router.get('/:filename', (req, res) => {
   const filePath = path.join(__dirname, '../../uploads', req.params.filename);
   res.sendFile(filePath, err => {
