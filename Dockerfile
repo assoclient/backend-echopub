@@ -32,14 +32,12 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY src/ ./src/
 COPY .env ./
 RUN mkdir -p uploads
-RUN  chown -R nodejs:nodejs /app/uploads
+RUN  chown -R nodejs:nodejs uploads
 RUN  chmod -R 755  /app/uploads
 
 # Create necessary directories
 RUN  chown -R nodejs:nodejs /app
 
-# Switch to non-root user
-USER nodejs
 
 # Expose port
 EXPOSE 5000
