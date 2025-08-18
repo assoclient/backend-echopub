@@ -45,12 +45,12 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
       const ad = await Campaign.findOne({
         campaign_test: true,
       }).populate('advertiser', 'name');
-      const adObject = {...ad.toObject()
+      const adObject = ad ? {...ad.toObject()
         ,expected_views: 100,
         expected_earnings: 0
-        }; 
+        } : null; 
       return res.status(200).json({
-        data: [adObject],
+        data: adObject ? [adObject] : [],
         totalCount: 1,
         campaign_test_ongoing: true,
         page: Number(page),

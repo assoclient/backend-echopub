@@ -30,8 +30,8 @@ async function closeDB() {
   }
 }
 
-const existingIP = '192.168.43.138'
-const newIP = '172.20.14.89'
+const existingIP = '172.20.14.89'
+const newIP = '172.20.14.32'
 
 async function updateCampaignMediaUrls() {
     try {
