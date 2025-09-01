@@ -92,6 +92,8 @@ exports.updateGeneralSettings = async (req, res) => {
 exports.updatePaymentSettings = async (req, res) => {
   try {
     const { 
+      cpv,
+      cpv_ambassador,
       platformCommission, 
       minCampaignAmount, 
       maxCampaignAmount, 
@@ -100,6 +102,18 @@ exports.updatePaymentSettings = async (req, res) => {
     } = req.body;
 
     // Validation
+    if (cpv < 1 || cpv > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le CPV doit être entre 1 et 100'
+      });
+    }
+    if (cpv_ambassador < 1 || cpv_ambassador > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le CPV ambassadeur doit être entre 1 et 50'
+      });
+    }
     if (platformCommission < 0 || platformCommission > 50) {
       return res.status(400).json({
         success: false,
@@ -127,6 +141,8 @@ exports.updatePaymentSettings = async (req, res) => {
     }
 
     settings.payment = {
+      cpv,
+      cpv_ambassador,
       platformCommission,
       minCampaignAmount,
       maxCampaignAmount,

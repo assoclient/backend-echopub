@@ -30,13 +30,13 @@ const settingsSchema = new mongoose.Schema({
   payment: {
     cpv: {
       type: Number,
-      min: 10,
+      min: 1,
       max: 100,
       default: 14
     },
     cpv_ambassador: {
       type: Number,
-      min: 5,
+      min: 1,
       max: 50,
       default: 10
     },
