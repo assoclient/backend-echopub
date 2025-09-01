@@ -47,7 +47,8 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
       }).populate('advertiser', 'name');
       const adObject = ad ? {...ad.toObject()
         ,expected_views: 100,
-        expected_earnings: 0
+        expected_earnings: 0,
+        shortLink:fromUrl + '/redirect/' +c.short_linkId,
         } : null; 
       return res.status(200).json({
         data: adObject ? [adObject] : [],
