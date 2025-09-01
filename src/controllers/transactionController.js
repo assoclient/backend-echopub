@@ -440,11 +440,11 @@ exports.withdrawFunds = async (req, res, next) => {
       // Appeler l'API Fapshi Withdraw
       const fapshiResponse = await fapshiApiCall('payout/', fapshiData, 'POST', FAPSHI_CONFIG_PAYOUT);
       
-      if (fapshiResponse && fapshiResponse.payoutId) {
+      if (fapshiResponse && fapshiResponse.transId) {
         // Mettre à jour la transaction avec la référence Fapshi
-        userExists.balance = userExists.balance - amount;
+        userExists.balance = userExists.balance - parseInt(amount);
         await userExists.save();
-        transaction.transactionId = fapshiResponse.payoutId;
+        transaction.transactionId = fapshiResponse.transId;
         transaction.status = 'pending';
         await transaction.save();
 
@@ -454,7 +454,7 @@ exports.withdrawFunds = async (req, res, next) => {
         return res.status(200).json({
           message: 'Retrait initialisé avec succès',
           transaction: transaction,
-          transactionId: fapshiResponse.payoutId,
+          transactionId: fapshiResponse.transId,
           status: 'pending',
           
           success: true,
