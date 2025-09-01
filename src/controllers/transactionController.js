@@ -424,7 +424,7 @@ exports.withdrawFunds = async (req, res, next) => {
 
     // Préparer les données pour Fapshi Withdraw API
     const fapshiData = {
-      amount: amount.toString(),
+      amount: amount,
       phone: phone, // Numéro de téléphone de l'ambassadeur
       description: `Retrait EchoPub: ${amount} FCFA pour ${userExists.name}`,
       externalId: transaction.reference,
