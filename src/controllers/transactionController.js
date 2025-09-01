@@ -131,78 +131,47 @@ exports.getMyTransactions = async (req, res, next) => {
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 
-// Configuration CamPay API
-const CAMPAY_CONFIG = {
-  baseUrl: process.env.CAMPAY_BASE_URL || 'https://demo.campay.net',
-  username: process.env.CAMPAY_USERNAME,
-  password: process.env.CAMPAY_PASSWORD,
-  accessToken: null,
-  tokenExpiry: null
+// Configuration Fapshi API
+  const FAPSHI_CONFIG_PAYOUT = {
+    baseUrl: process.env.FAPSHI_BASE_URL || 'https://live.fapshi.com',
+    apikey: process.env.FAPSHI_API_KEY_PAYOUT,
+    apiuser: process.env.FAPSHI_API_USER_PAYOUT
+  }; 
+const FAPSHI_CONFIG_COLLECT = {
+  baseUrl: process.env.FAPSHI_BASE_URL || 'https://live.fapshi.com',
+  apikey: process.env.FAPSHI_API_KEY_COLLECT,
+  apiuser: process.env.FAPSHI_API_USER_COLLECT
 }; 
-
-// Fonction pour obtenir un token d'accès CamPay
-async function getCamPayToken() {
+// Fonction pour effectuer un appel API Fapshi avec authentification
+async function fapshiApiCall(endpoint, data = null, method = 'GET', config = FAPSHI_CONFIG_PAYOUT) {
   try {
-    // Vérifier si le token est encore valide
-    if (CAMPAY_CONFIG.accessToken && CAMPAY_CONFIG.tokenExpiry && Date.now() < CAMPAY_CONFIG.tokenExpiry) {
-      return CAMPAY_CONFIG.accessToken;
-    }
-
-    console.log('🔄 Récupération d\'un nouveau token CamPay...');
-    
-    const response = await axios.post(`${CAMPAY_CONFIG.baseUrl}/api/token/`, {
-      username: CAMPAY_CONFIG.username,
-      password: CAMPAY_CONFIG.password
-    });
-
-    if (response.data && response.data.token) {
-      CAMPAY_CONFIG.accessToken = response.data.token;
-      // Le token expire dans 1 heure (3600 secondes)
-      CAMPAY_CONFIG.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-      
-      console.log('✅ Token CamPay obtenu avec succès');
-      return CAMPAY_CONFIG.accessToken;
-    } else {
-      throw new Error('Réponse invalide de CamPay API');
-    }
-  } catch (error) {
-    console.error('❌ Erreur lors de l\'obtention du token CamPay:', error.message);
-    throw new Error('Impossible de s\'authentifier auprès de CamPay');
-  }
-}
-
-// Fonction pour effectuer un appel API CamPay avec authentification
-async function camPayApiCall(endpoint, data = null, method = 'GET') {
-  try {
-    const token = await getCamPayToken();
-    
-    const config = {
+    const cfg = {
       method: method.toLowerCase(),
-      url: `${CAMPAY_CONFIG.baseUrl}/api/${endpoint}`,
+      url: `${config.baseUrl}/${endpoint}`,
       headers: {
-        'Authorization': `Token ${token}`,
-        'Content-Type': 'application/json'
+        'apikey': `${config.apikey}`,
+        'Content-Type': 'application/json',
+        'apiuser': config.apiuser
       }
     };
-
     if (data && method !== 'GET') {
-      config.data = data;
+      cfg.data = data;
     }
 
-    console.log(`🌐 Appel CamPay API: ${method} ${endpoint}`, data || '');
+    console.log(`🌐 Appel Fapshi API: ${method} ${endpoint}`, data || '');
     
-    const response = await axios(config);
+    const response = await axios(cfg);
     return response.data;
   } catch (error) {
-    console.error(`❌ Erreur CamPay API (${endpoint}):`, error.response?.data || error.message);
+    console.error(`❌ Erreur Fapshi API (${endpoint}):`, error.response?.data || error.message);
     throw error;
   }
 }
- // Fonction pour vérifier le statut CamPay
+ // Fonction pour vérifier le statut Fapshi
  async function checkStatus(reference, transaction) {
   try {
-    // Appel à l'API CamPay pour vérifier le statut
-    const statusResponse = await camPayApiCall(`transaction/${reference}`, {}, 'GET');
+    // Appel à l'API Fapshi pour vérifier le statut
+    const statusResponse = await fapshiApiCall(`payment-status/${reference}`, {}, 'GET', FAPSHI_CONFIG_COLLECT);
     if (statusResponse && statusResponse.status) {
       lastStatus = statusResponse.status;
       console.log('statusResponse', lastStatus);
@@ -223,7 +192,7 @@ async function camPayApiCall(endpoint, data = null, method = 'GET') {
     }
   } catch (err) {
     // On ignore l'erreur pour continuer à checker
-    console.error('Erreur lors de la vérification du statut CamPay:', err.message);
+    console.error('Erreur lors de la vérification du statut Fapshi:', err.message);
   }
   return null;
 }
@@ -284,33 +253,38 @@ exports.createTransaction = async (req, res, next) => {
       reference: reference,
       status: 'pending',
       description: `Dépôt pour la campagne: ${campaignExists.title}`,
+      transactionData: paymentData,
       //external_reference: uuidv4() // Référence externe pour CamPay
     });
     
     await transaction.save();
 
-    // Préparer les données pour CamPay Collect API
-    const camPayData = {
-      amount: campaignExists.budget.toString(),
+    // Préparer les données pour Fapshi Collect API
+    const fapshiData = {
+      amount: campaignExists.budget,
       currency: 'XAF',
-      from: paymentData.phone, // Numéro de téléphone de l'utilisateur
+      phone: paymentData.phone, // Numéro de téléphone de l'utilisateur
       description: `Dépôt pour la campagne: ${campaignExists.title}`,
-      external_reference: transaction.reference
+      externalId: transaction.reference,
+      name: userExists.name,
+      email: userExists.email,
+      userId: userExists._id,
+      message: `Dépôt pour la campagne: ${campaignExists.title}`
     };
 
-    console.log('🚀 Initialisation du paiement CamPay:', camPayData);
+    console.log('🚀 Initialisation du paiement Fapshi:', fapshiData);
 
     try {
-      // Appeler l'API CamPay Collect
-      const camPayResponse = await camPayApiCall('collect/', camPayData, 'POST');
+      // Appeler l'API Fapshi Collect
+      const fapshiResponse = await fapshiApiCall('direct-pay/', fapshiData, 'POST', FAPSHI_CONFIG_COLLECT);
       
-      if (camPayResponse && camPayResponse.reference) {
-        // Mettre à jour la transaction avec la référence CamPay
-        transaction.transactionId = camPayResponse.reference;
+      if (fapshiResponse && fapshiResponse.transId) {
+        // Mettre à jour la transaction avec la référence Fapshi
+        transaction.transactionId = fapshiResponse.transId;
         transaction.status = 'pending';
         await transaction.save();
 
-        console.log('✅ Paiement CamPay initialisé:', camPayResponse);
+        console.log('✅ Paiement Fapshi initialisé:', fapshiResponse);
         // On donne 30s à l'utilisateur pour valider le paiement sur son mobile
         // On vérifie le statut toutes les 5 secondes, max 30s
         const checkInterval = 5000; // 5 secondes
@@ -326,7 +300,7 @@ exports.createTransaction = async (req, res, next) => {
           // Attendre 5 secondes
           await new Promise(resolve => setTimeout(resolve, checkInterval));
           elapsed += checkInterval;
-          const result = await checkStatus(camPayResponse.reference, transaction);
+          const result = await checkStatus(fapshiResponse.transId, transaction);
           if (result === true) {
             statusChecked = true;
             // Paiement confirmé, on sort de la boucle
@@ -347,10 +321,9 @@ exports.createTransaction = async (req, res, next) => {
           return res.status(400).json({
             message: 'Transaction non confirmée',
             transaction: transaction,
-            transactionId: camPayResponse.reference,
-            ussd_code: camPayResponse.ussd_code,
-            operator: camPayResponse.operator,
-            instructions: `Utilisez le code USSD ${camPayResponse.ussd_code} pour compléter le paiement`
+            transactionId: fapshiResponse.transId,
+            status: 'failed',
+            success: false,
           });
         }
         campaignExists.status = 'submitted';
@@ -359,18 +332,17 @@ exports.createTransaction = async (req, res, next) => {
         return res.status(200).json({
           message: 'Transaction créée et paiement initialisé',
           transaction: transaction,
-          transactionId: camPayResponse.reference,
-          ussd_code: camPayResponse.ussd_code,
-          operator: camPayResponse.operator,
-          instructions: `Utilisez le code USSD ${camPayResponse.ussd_code} pour compléter le paiement`
+          transactionId: fapshiResponse.transId,
+          transactionData: fapshiData,
+          instructions: `Utilisez le code USSD #150*50#(Orange) ou *126#(MTN) pour compléter le paiement`
         });
       } else {
-        throw new Error('Réponse invalide de CamPay');
+        throw new Error('Réponse invalide de Fapshi');
       }
-    } catch (camPayError) {
-      // En cas d'erreur CamPay, marquer la transaction comme échouée
+    } catch (fapshiError) {
+      // En cas d'erreur Fapshi, marquer la transaction comme échouée
       transaction.status = 'failed';
-      transaction.error_message = camPayError.message;
+      transaction.error_message = fapshiError.message;
       await transaction.save();
       
       return res.status(400).json({
@@ -445,57 +417,63 @@ exports.withdrawFunds = async (req, res, next) => {
       reference: reference,
       status: 'pending',
       description: `Retrait de ${amount} FCFA`,
+      transactionData: {phone: phone, amount: amount},
     });
 
     await transaction.save();
 
-    // Préparer les données pour CamPay Withdraw API
-    const camPayData = {
+    // Préparer les données pour Fapshi Withdraw API
+    const fapshiData = {
       amount: amount.toString(),
-      to: phone, // Numéro de téléphone de l'ambassadeur
-      description: `Retrait EchoPub: ${amount} FCFA`,
-      external_reference: transaction.reference
+      phone: phone, // Numéro de téléphone de l'ambassadeur
+      description: `Retrait EchoPub: ${amount} FCFA pour ${userExists.name}`,
+      externalId: transaction.reference,
+      name: userExists.name,
+      email: userExists.email,
+      userId: userExists._id,
+      message: `Retrait EchoPub: ${amount} FCFA pour ${userExists.name}`
     };
 
-    console.log('🚀 Initialisation du retrait CamPay:', camPayData);
+    console.log('🚀 Initialisation du retrait Fapshi:', fapshiData);
 
     try {
-      // Appeler l'API CamPay Withdraw
-      const camPayResponse = await camPayApiCall('withdraw/', camPayData, 'POST');
+      // Appeler l'API Fapshi Withdraw
+      const fapshiResponse = await fapshiApiCall('payout/', fapshiData, 'POST', FAPSHI_CONFIG_PAYOUT);
       
-      if (camPayResponse && camPayResponse.reference) {
-        // Mettre à jour la transaction avec la référence CamPay
+      if (fapshiResponse && fapshiResponse.payoutId) {
+        // Mettre à jour la transaction avec la référence Fapshi
         userExists.balance = userExists.balance - amount;
         await userExists.save();
-        transaction.transactionId = camPayResponse.reference;
+        transaction.transactionId = fapshiResponse.payoutId;
         transaction.status = 'pending';
         await transaction.save();
 
-        console.log('✅ Retrait CamPay initialisé:', camPayResponse);
+        console.log('✅ Retrait Fapshi initialisé:', fapshiResponse);
         
         // Retourner la réponse
         return res.status(200).json({
           message: 'Retrait initialisé avec succès',
           transaction: transaction,
-          transactionId: camPayResponse.reference,
+          transactionId: fapshiResponse.payoutId,
           status: 'pending',
           
           success: true,
           note: 'Le retrait sera traité dans les prochaines minutes'
         });
       } else {
-        throw new Error('Réponse invalide de CamPay');
+        throw new Error('Réponse invalide de Fapshi');
       }
-    } catch (camPayError) {
-      // En cas d'erreur CamPay, marquer la transaction comme échouée
+    } catch (fapshiError) {
+      // En cas d'erreur Fapshi, marquer la transaction comme échouée
       transaction.status = 'failed';
-      transaction.error_message = camPayError.message;
+      transaction.error_message = fapshiError.message;
       await transaction.save();
       
       return res.status(400).json({
         message: 'Erreur lors du retrait',
         transaction: transaction,
         transactionId: null,
+        transactionData: fapshiData,
         status: 'failed',
         success: false,
       });
@@ -520,8 +498,7 @@ exports.checkTransactionStatus = async (req, res, next) => {
     const transaction = await Transaction.findOne({ 
       $or: [
         { reference: reference },
-        { campay_reference: reference },
-        { external_reference: reference }
+        { transactionId: reference }
       ]
     });
 
@@ -530,9 +507,9 @@ exports.checkTransactionStatus = async (req, res, next) => {
     }
 
     // Si la transaction a une référence CamPay, vérifier le statut
-    if (transaction.campay_reference) {
+    if (transaction.transactionId) {
       try {
-        const camPayStatus = await camPayApiCall(`transaction/${transaction.campay_reference}/`);
+        const camPayStatus = await fapshiApiCall(`transaction/${transaction.transactionId}`, {}, 'GET', FAPSHI_CONFIG_COLLECT  );
         
         if (camPayStatus) {
           // Mettre à jour le statut de la transaction selon la réponse CamPay
@@ -553,9 +530,7 @@ exports.checkTransactionStatus = async (req, res, next) => {
           // Mettre à jour la transaction si le statut a changé
           if (newStatus !== transaction.status) {
             transaction.status = newStatus;
-            transaction.campay_status = camPayStatus.status;
-            transaction.operator_reference = camPayStatus.operator_reference;
-            transaction.campay_code = camPayStatus.code;
+            
             
             await transaction.save();
 
@@ -600,6 +575,9 @@ exports.checkTransactionStatus = async (req, res, next) => {
 // Webhook pour mettre à jour le statut d'une transaction de retrait
 exports.withdrawalWebhook = async (req, res, next) => {
   try {
+    console.log('🚀 Webhook pour mettre à jour le statut d\'une transaction de retrait:');
+    console.log('Body:', req.body);
+    console.log('Query:', req.query);
     const { external_reference, reference,status } = req.query;
     if (!external_reference || !status|| !reference) {
       return res.status(400).json({ message: 'transactionId et status requis' });

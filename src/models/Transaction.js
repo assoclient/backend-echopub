@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { Mixed } = mongoose.Schema.Types;
 
 const transactionSchema = new mongoose.Schema({
   reference: { type: String, required: true, unique: true }, // Référence unique de la transaction
@@ -11,6 +12,7 @@ const transactionSchema = new mongoose.Schema({
   ambassador: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   description: { type: String },
   error_message: { type: String },
+  transactionData: { type: Mixed },
   campaign: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign' }, // Paiement campagne
 }, { timestamps: true });
 
