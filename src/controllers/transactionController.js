@@ -578,12 +578,21 @@ exports.withdrawalWebhook = async (req, res, next) => {
     console.log('🚀 Webhook pour mettre à jour le statut d\'une transaction de retrait:');
     console.log('Body:', req.body);
     console.log('Query:', req.query);
-    const { external_reference, reference,status } = req.query;
-    if (!external_reference || !status|| !reference) {
+    const { 
+      transId,
+      status,
+      amount,
+      revenue,
+      payerName,
+      email,
+      externalId,
+      userId,
+      dateConfirmed } = req.body;
+    if (!transId || !status) {
       return res.status(400).json({ message: 'transactionId et status requis' });
     }
     const Transaction = require('../models/Transaction');
-    const transaction = await Transaction.findById({reference:external_reference});
+    const transaction = await Transaction.findById({reference:transId});
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction non trouvée' });
     }
@@ -591,7 +600,7 @@ exports.withdrawalWebhook = async (req, res, next) => {
       transaction.status = 'confirmed'; 
       
   }
-   transaction.transactionId = reference
+   transaction.transactionId = transId
    await transaction.save();
     res.json({ message: 'Statut de la transaction mis à jour', transaction });
   } catch (err) {

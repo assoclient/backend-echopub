@@ -19,7 +19,7 @@ router.post('/', auth,
   role('advertiser'), 
   transactionController.createTransaction
 );
-router.get('callback-campay',transactionController.withdrawalWebhook)
+router.post('callback-withdraw',transactionController.withdrawalWebhook)
 // Retrait d'argent (ambassadeurs seulement)
 router.post('/withdraw', auth,
   role('ambassador'), 
