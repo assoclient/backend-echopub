@@ -12,6 +12,7 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
     const { page = 1, pageSize = 10, search = '' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     const ambassador = await User.findById(req.user.id);
+    const fromUrl = process.env.FRONTEND_URL || '';
     if(!ambassador) {
       return res.status(404).json({
         success: false,
@@ -78,7 +79,7 @@ router.get('/active-campaigns', auth, async (req, res, next) => {
     
     // Compter le total des campagnes disponibles (pour la pagination)
     const total = await Campaign.countDocuments(query);
-    const fromUrl = process.env.FRONTEND_URL || '';
+   
     // Trouver les campagnes disponibles avec pagination
     let campaigns = await Campaign.find(query).populate('advertiser', 'name')
       .skip(skip)
