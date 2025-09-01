@@ -12,7 +12,7 @@ const campaignSchema = new mongoose.Schema({
   }],
   number_views_assigned: { type: Number, default: 0 },
   expected_views: { type: Number, min: 1 },
-  cpv: { type: Number, min: 14 ,default: 14 }, // CPV minimum pour l'annonceur
+  cpv: { type: Number, min: 1 ,default: 14 }, // CPV minimum pour l'annonceur
   cpv_ambassador: { type: Number, default:10 }, // CPV pour l'ambassadeur
   start_date: Date,
   end_date: Date,
