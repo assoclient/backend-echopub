@@ -107,7 +107,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     ac.status = 'published';
     ac.target_views = target_views;
     await ac.save();
-    
+    await campaignDoc.save();
     res.status(201).json({
       message: 'Première capture uploadée avec succès',
       fileUrl: ac.screenshot_url,
