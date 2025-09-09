@@ -179,7 +179,7 @@ exports.validatePublication = async (req, res, next) => {
     
     const publication = await AmbassadorCampaign.findById(id)
       .populate('ambassador', 'name')
-      .populate('campaign', 'title expected_views cpv_ambassador');
+      .populate('campaign', 'title expected_views cpv_ambassador campaign_test');
     
     if (!publication) {
       return res.status(404).json({
