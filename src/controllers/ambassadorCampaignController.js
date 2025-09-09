@@ -113,7 +113,7 @@ exports.getAllAmbassadorCampaigns = async (req, res, next) => {
     
     const count = await AmbassadorCampaign.countDocuments(query);
     const docs = await AmbassadorCampaign.find(query)
-      .populate('campaign', 'title description budget')
+      .populate('campaign', 'title description budget cpv_ambassador cpv campaign_test')
       .populate('ambassador', 'name email phone')
       .sort({ createdAt: -1 }) // Les plus récentes en premier
       .skip((page - 1) * pageSize)
