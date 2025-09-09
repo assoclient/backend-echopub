@@ -210,7 +210,7 @@ exports.validatePublication = async (req, res, next) => {
       });
     } 
     
-    const cpv_ambassador = publication.campaign.cpv_ambassador;
+    let cpv_ambassador = publication.campaign.cpv_ambassador;
     if(publication.campaign.campaign_test) {
       cpv_ambassador = 0;
     }
