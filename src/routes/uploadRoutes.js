@@ -48,6 +48,11 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     }).populate('campaign', 'expected_views number_views_assigned');
      //const numberDays = getNumberOfDayBeetweenDates(campaignDoc.start_date, campaignDoc.end_date)+90;
     // const token = jwt.sign({ campaign, ambassador }, process.env.JWT_SECRET, { expiresIn: `${numberDays}d` });
+    let target_views=100;
+    if(!campaignDoc.campaign_test) {
+      target_views = ambassador.view_average < (campaignDoc.expected_views - campaignDoc.number_views_assigned) ? ambassador.view_average : (campaignDoc.expected_views - campaignDoc.number_views_assigned)
+    }
+
     if (!ac) {
 
       // Créer une nouvelle attribution si elle n'existe pas
@@ -57,6 +62,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
         status: 'published',
        // link:fromUrl + '/redirect_url/' + token,
       });
+     campaignDoc.number_views_assigned=campaignDoc.number_views_assigned+target_views;
     }
     
     // Si une première capture existe déjà, refuser
@@ -99,7 +105,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     
     // Mettre à jour le statut
     ac.status = 'published';
-    ac.target_views = ambassador.view_average < (campaignDoc.expected_views - campaignDoc.number_views_assigned) ? ambassador.view_average : (campaignDoc.expected_views - campaignDoc.number_views_assigned)
+    ac.target_views = target_views;
     await ac.save();
     
     res.status(201).json({
