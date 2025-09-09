@@ -14,9 +14,41 @@ exports.updateAmbassadorCampaign = async (req, res, next) => {
 // Suppression d'une attribution ambassadeur-campagne
 exports.deleteAmbassadorCampaign = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const ac = await AmbassadorCampaign.findByIdAndDelete(id);
-    if (!ac) return res.status(404).json({ message: 'Attribution non trouvée' });
+    const { id } = req.params;  
+    const acDeleted = await AmbassadorCampaign.findById(id);
+    if(!acDeleted) return res.status(404).json({ message: 'Attribution non trouvée' });
+    if(acDeleted.status === 'validated'||acDeleted.status === 'submitted') return res.status(400).json({ message: 'Cette attribution est validée ou soumise et ne peut être supprimée' });
+    await AmbassadorCampaign.findByIdAndDelete(id);
+    const screenshot_url = acDeleted.screenshot_url;
+    const screenshot_url2 = acDeleted.screenshot_url2;
+    try {
+      if (screenshot_url) {
+        const uploadIndex = screenshot_url.indexOf('/uploads/');
+        if (uploadIndex !== -1) {
+          const filePath = screenshot_url.substring(uploadIndex + 1);
+          const fs = require('fs');
+          fs.unlink(filePath, (err) => {
+            if (err) {
+              console.warn('Erreur suppression média:', err.message);
+            }
+          });
+        }
+      }
+      if (screenshot_url2) {
+       const uploadIndex = screenshot_url2.indexOf('/uploads/');
+       if (uploadIndex !== -1) {
+        const filePath = screenshot_url2.substring(uploadIndex + 1);
+        const fs = require('fs');
+        fs.unlink(filePath, (err) => {
+          if (err) {
+              console.warn('Erreur suppression média:', err.message);
+            }
+          });
+        }
+      }
+    } catch (error) {
+      
+    }
     res.json({ message: 'Attribution supprimée' });
   } catch (err) {
     next(err);
