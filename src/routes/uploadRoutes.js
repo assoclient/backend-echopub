@@ -34,7 +34,7 @@ router.post('/screenshot/:campaign', auth, upload.single('file'), async (req, re
     if (!campaignDoc) {
       return res.status(404).json({ message: 'Campagne non trouvée' });
     }
-    if(campaignDoc.expected_views <= campaignDoc.number_views_assigned) {
+    if(!campaignDoc.campaign_test && campaignDoc.expected_views <= campaignDoc.number_views_assigned) {
       return res.status(400).json({ message: 'Le nombre d\'attributions pour cette campagne est atteint pour le moment!' });
     }
     const ambassador = await User.findById(userId);
