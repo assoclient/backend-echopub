@@ -9,7 +9,9 @@ const morgan = require('morgan');
 const app = express();
 app.use(morgan('dev'));
 app.use(cors());
-app.use(express.json());
+// Increase body limits for JSON/form payloads (metadata of uploads)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Dossier uploads accessible publiquement
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

@@ -16,7 +16,11 @@ const storage = multer.diskStorage({
     cb(null, base + '.' + ext);
   }
 });
-const upload = multer({ storage });
+// Configure upload limits (adjust max size as needed)
+const upload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100 MB
+});
 
 const auth = require('../middleware/auth');
 const role = require('../middleware/role');
