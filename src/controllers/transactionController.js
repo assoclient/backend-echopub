@@ -306,7 +306,7 @@ exports.createTransaction = async (req, res, next) => {
             // Paiement confirmé, on sort de la boucle
             break;
           } else if (result === false) {
-            statusChecked = true;
+            statusChecked = false;
             // Paiement échoué, on sort de la boucle
             break;
           }
@@ -326,8 +326,8 @@ exports.createTransaction = async (req, res, next) => {
             success: false,
           });
         }
-        campaignExists.status = 'submitted';
-        await campaignExists.save();
+        //campaignExists.status = 'submitted';
+        //await campaignExists.save();
         // Retourner la réponse avec les instructions
         return res.status(200).json({
           message: 'Transaction créée et paiement initialisé',
