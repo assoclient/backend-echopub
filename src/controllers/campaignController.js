@@ -425,11 +425,16 @@ exports.deleteCampaign = async (req, res, next) => {
         if (uploadIndex !== -1) {
           const filePath = url.substring(uploadIndex + 1); // retire le slash initial
           const fs = require('fs');
-          fs.unlink(filePath, (err) => {
-            if (err) {
-              console.warn('Erreur suppression média:', err.message);
+          fs.exists(filePath, (exists) => {
+            if (exists) {
+              fs.unlink(filePath, (err) => {
+                if (err) {
+                  console.warn('Erreur suppression média:', err.message);
+                }
+              });
             }
           });
+          
         }
       } catch (err) {
         console.warn('Erreur suppression média:', err.message);
