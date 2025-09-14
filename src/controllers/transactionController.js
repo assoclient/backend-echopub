@@ -391,8 +391,8 @@ exports.withdrawFunds = async (req, res, next) => {
     if (amount > userExists.balance) {
       return res.status(400).json({ message: 'Votre solde est insuffisant' });
     }
-    if(amount < 500) {
-      return res.status(400).json({ message: 'Le montant minimum de retrait est de 100 FCFA' });
+    if(amount < 200) {
+      return res.status(400).json({ message: 'Le montant minimum de retrait est de 200 FCFA' });
     }
     // Vérifier que l'utilisateur a suffisamment de fonds
     // TODO: Implémenter la logique de vérification du solde
