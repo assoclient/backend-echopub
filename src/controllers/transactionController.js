@@ -319,15 +319,15 @@ exports.createTransaction = async (req, res, next) => {
           transaction.error_message = 'Temps de validation dépassé. Paiement non confirmé.';
           await transaction.save();
           return res.status(400).json({
-            message: 'Transaction non confirmée',
+            message: 'Temps de validation dépassé. Transaction non confirmée',
             transaction: transaction,
             transactionId: fapshiResponse.transId,
             status: 'failed',
             success: false,
           });
         }
-        //campaignExists.status = 'submitted';
-        //await campaignExists.save();
+        campaignExists.status = 'submitted';
+        await campaignExists.save();
         // Retourner la réponse avec les instructions
         return res.status(200).json({
           message: 'Transaction créée et paiement initialisé',

@@ -553,12 +553,12 @@ exports.getAmbassadorTransactions = async (req, res) => {
     const pageSize = req.query.pageSize || 10;
     const skip = (parseInt(page) - 1) * parseInt(pageSize);
     const transactions = await Transaction.find({ user: ambassadorId, 
-      type: { $in: ['payment', 'withdrawal'] },status: 'confirmed'}).populate('campaign', 'title')
+      type: { $in: ['payment', 'withdrawal'] },status: {$in: ['confirmed', 'pending']}}).populate('campaign', 'title')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(pageSize));
     const totalCount = await Transaction.countDocuments({ ambassador: ambassadorId, 
-      type: { $in: ['payment', 'withdrawal'] },status: 'confirmed' });
+      type: { $in: ['payment', 'withdrawal'] },status: {$in: ['confirmed', 'pending']} });
     res.json({
       success: true,
       page: Number(page),
