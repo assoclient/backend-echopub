@@ -10,9 +10,9 @@ exports.register = async (req, res, next) => {
       const existing = await User.findOne({ email });
       if (existing) return res.status(400).json({ message: 'Email déjà utilisé' });
     }
-    if(phone){
+    if(whatsapp_number){
       const existing = await User.findOne({ whatsapp_number: whatsapp_number });
-      if (existing) return res.status(400).json({ message: 'Numéro de téléphone déjà utilisé' });
+      if (existing) return res.status(400).json({ message: 'Numéro de whatsapp déjà utilisé' });
     }
     const hash = await bcrypt.hash(password, 10);
     console.log(ageRange,gender);
