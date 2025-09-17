@@ -15,10 +15,16 @@ exports.register = async (req, res, next) => {
       if (existing) return res.status(400).json({ message: 'Numéro de whatsapp déjà utilisé' });
     }
     const hash = await bcrypt.hash(password, 10);
-    console.log(ageRange,gender);
+    let newLocation = {};
+    if(location.city){
+      newLocation.city = location.city.replace(/ /g, '').replace(/Région de l'/g, '').replace(/Région du/g, '');
+    }
+    if(location.region){
+      newLocation.region = location.region.replace(/ /g, '').replace(/Région du/g, '');
+    }
     const user = await User.create({
       name, email, ageRange,
-      gender, phone, password: hash, role, whatsapp_number, location, contacts_count, audience
+      gender, phone, password: hash, role, whatsapp_number, newLocation, contacts_count, audience
     });
     
     // Logger l'activité selon le rôle
