@@ -17,7 +17,7 @@ exports.deleteAmbassadorCampaign = async (req, res, next) => {
     const { id } = req.params;  
     const acDeleted = await AmbassadorCampaign.findById(id).populate('campaign', 'expected_views number_views_assigned');
     if(!acDeleted) return res.status(404).json({ message: 'Attribution non trouvée' });
-    if(acDeleted.status === 'validated'||acDeleted.status === 'submitted') return res.status(400).json({ message: 'Cette attribution est validée ou soumise et ne peut être supprimée' });
+    if(acDeleted.status === 'validated') return res.status(400).json({ message: 'Cette attribution est validée ou soumise et ne peut être supprimée' });
     if(acDeleted.campaign.number_views_assigned-acDeleted.target_views >= 0){
       acDeleted.campaign.number_views_assigned -= acDeleted.target_views;
       await acDeleted.campaign.save();
