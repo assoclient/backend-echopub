@@ -73,6 +73,8 @@ exports.createUser = async (req, res, next) => {
     }
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email déjà utilisé' });
+    const existingWhatsapp = await User.findOne({ whatsapp_number });
+    if (existingWhatsapp) return res.status(400).json({ message: 'Numéro de téléphone déjà utilisé' });
     const hash = await bcrypt.hash(password, 10);
     const user = await User.create({
       name, email, phone, password: hash, role, whatsapp_number, location, contacts_count
