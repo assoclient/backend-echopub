@@ -15,7 +15,7 @@ exports.register = async (req, res, next) => {
       if (existing) return res.status(400).json({ message: 'Numéro de whatsapp déjà utilisé' });
     }
     const hash = await bcrypt.hash(password, 10);
-    let newLocation = {};
+    let newLocation = location;
     if(location.city){
       newLocation.city = location.city.replace(/ /g, '').replace(/Région de l'/g, '').replace(/Région du/g, '');
     }
