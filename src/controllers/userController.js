@@ -45,6 +45,7 @@ exports.getAllUsers = async (req, res, next) => {
     const count = await require('../models/User').countDocuments(query);
     const docs = await require('../models/User')
       .find(query)
+      .sort({ createdAt: -1 })
       .skip((page - 1) * pageSize)
       .limit(Number(pageSize));
     res.json({
