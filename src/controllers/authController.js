@@ -17,10 +17,10 @@ exports.register = async (req, res, next) => {
     const hash = await bcrypt.hash(password, 10);
     let newLocation = location;
     if(location.city){
-      newLocation.city = location.city.replace(/ /g, '').replace(/Région de l'/g, '').replace(/Région du/g, '');
+      newLocation.city = location.city.replace(/ /g, '');
     }
     if(location.region){
-      newLocation.region = location.region.replace(/ /g, '').replace(/Région du/g, '');
+      newLocation.region = location.region.replace(/Région de l'/g, '').replace(/Région du/g, '').replace(/ /g, '');
     }
     const user = await User.create({
       name, email, ageRange,
@@ -63,7 +63,7 @@ exports.login = async (req, res, next) => {
     if (!user) return res.status(400).json({ message: 'Utilisateur introuvable' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: 'Mot de passe incorrect' });
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8000d' });
     res.json({ token, user: { ...user.toObject(), password: undefined } });
   } catch (err) {
     next(err);
